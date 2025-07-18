@@ -1,7 +1,9 @@
 package com.braided_beauty.braided_beauty.dtos.user.guest;
 
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,9 +16,14 @@ import java.util.UUID;
 @Getter
 @Setter
 public class UserGuestResponseDTO {
+    @NotNull
     private final UUID id;
+    @NotNull
     private final String name;
+    @NotNull
     private final UserType userType;
+    @NotNull
     private final LocalDateTime createdAt;
-    private final List<Appointment> appointments; // Change to GuestAppointmentDTO once it is created
+    @NotNull
+    private final AppointmentResponseDTO appointment;
 }
