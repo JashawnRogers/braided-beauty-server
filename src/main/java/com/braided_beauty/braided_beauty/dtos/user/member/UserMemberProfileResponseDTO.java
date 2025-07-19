@@ -1,4 +1,4 @@
-package com.braided_beauty.braided_beauty.dtos.user.member.profile;
+package com.braided_beauty.braided_beauty.dtos.user.member;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;

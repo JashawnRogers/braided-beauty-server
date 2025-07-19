@@ -1,4 +1,4 @@
-package com.braided_beauty.braided_beauty.dtos.user.member.profile;
+package com.braided_beauty.braided_beauty.dtos.user.member;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
