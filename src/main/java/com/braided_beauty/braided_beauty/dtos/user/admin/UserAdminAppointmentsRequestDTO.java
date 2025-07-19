@@ -1,6 +1,5 @@
-package com.braided_beauty.braided_beauty.dtos.appointment;
+package com.braided_beauty.braided_beauty.dtos.user.admin;
 
-import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -13,18 +12,14 @@ import java.util.UUID;
 @AllArgsConstructor
 @Getter
 @Setter
-public class AppointmentResponseDTO {
+public class UserAdminAppointmentsRequestDTO {
     @NotNull
-    private final UUID id;
+    private final UUID appointmentId;
+    @NotNull
+    private final UUID serviceId;
     @NotNull
     private final LocalDateTime appointmentTime;
     @NotNull
     private final AppointmentStatus appointmentStatus;
-    @NotNull
-    private final LocalDateTime createdAt;
-    @NotNull
-    private final ServiceResponseDTO service;
-    private final Integer pointsEarned;
-    private final LocalDateTime updatedAt;
-    private final String note;
+    private final String notes;
 }

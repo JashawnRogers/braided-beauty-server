@@ -43,6 +43,9 @@ public class Appointment {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
+
     @PrePersist
     protected void onCreate(){
         createdAt = LocalDateTime.now();

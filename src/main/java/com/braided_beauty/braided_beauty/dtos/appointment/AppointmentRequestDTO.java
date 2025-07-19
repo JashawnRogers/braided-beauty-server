@@ -16,4 +16,5 @@ public class AppointmentRequestDTO {
     private final LocalDateTime appointmentTime;
     @NotNull
     private final UUID serviceId;
+    private final String note;
 }
