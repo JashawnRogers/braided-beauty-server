@@ -17,4 +17,6 @@ public class ServiceResponseDTO {
     private final String description;
     private final BigDecimal price;
     private final Integer durationMinutes;
+    private String photoUrl;
+    private String videoUrl;
 }

@@ -30,6 +30,12 @@ public class Service {
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
+    @Column(name = "photo_url")
+    private String photo_url;
+
+    @Column(name = "video_url")
+    private String video_url;
+
     @OneToMany(mappedBy = "service")
     private List<Appointment> appointments;
 }
