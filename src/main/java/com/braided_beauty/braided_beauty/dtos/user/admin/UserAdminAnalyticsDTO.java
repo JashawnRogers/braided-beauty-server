@@ -1,11 +1,13 @@
 package com.braided_beauty.braided_beauty.dtos.user.admin;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 
+@Builder
 @AllArgsConstructor
 @Getter
 @Setter
