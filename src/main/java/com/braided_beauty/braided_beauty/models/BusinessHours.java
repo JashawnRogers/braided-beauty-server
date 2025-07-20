@@ -1,14 +1,9 @@
 package com.braided_beauty.braided_beauty.models;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 
+import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -18,37 +13,24 @@ import java.util.UUID;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 public class BusinessHours {
     // Should be a single row in DB
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    private boolean isMondayOpen;
-    private LocalTime mondayOpenTime;
-    private LocalTime mondayCloseTime;
 
-    private boolean isTuesdayOpen;
-    private LocalTime tuesdayOpenTime;
-    private LocalTime tuesdayCloseTime;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private DayOfWeek dayOfWeek;
 
-    private boolean isWednesdayOpen;
-    private LocalTime wednesdayOpenTime;
-    private LocalTime wednesdayCloseTime;
+    @Column(nullable = true)
+    private LocalTime openTime;
 
-    private boolean isThursdayOpen;
-    private LocalTime thursdayOpenTime;
-    private LocalTime thursdayCloseTime;
+    @Column(nullable = true)
+    private LocalTime closeTime;
 
-    private boolean isFridayOpen;
-    private LocalTime fridayOpenTime;
-    private LocalTime fridayCloseTime;
-
-    private boolean isSaturdayOpen;
-    private LocalTime saturdayOpenTime;
-    private LocalTime saturdayCloseTime;
-
-    private boolean isSundayOpen;
-    private LocalTime sundayOpenTime;
-    private LocalTime sundayCloseTime;
+    @Column(nullable = false)
+    private boolean isClosed;
 }
