@@ -1,10 +1,7 @@
 package com.braided_beauty.braided_beauty.models;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,6 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 public class Service {
     @Id
     @GeneratedValue
@@ -31,10 +29,10 @@ public class Service {
     private Integer durationMinutes;
 
     @Column(name = "photo_url")
-    private String photo_url;
+    private String photoUrl;
 
     @Column(name = "video_url")
-    private String video_url;
+    private String videoUrl;
 
     @OneToMany(mappedBy = "service")
     private List<Appointment> appointments;
