@@ -19,7 +19,7 @@ public class UserMemberMapper {
                 .build();
     }
 
-    public UserMemberProfileResponseDTO toUserMemberProfileResponseDTO(AppointmentResponseDTO appointment,
+    public UserMemberProfileResponseDTO toDTO(AppointmentResponseDTO appointment,
                                                                        User user,
                                                                        LoyaltyRecordResponseDTO loyaltyRecord){
         return UserMemberProfileResponseDTO.builder()

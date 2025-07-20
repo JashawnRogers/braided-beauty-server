@@ -19,7 +19,7 @@ public class ServiceDtoMapper {
                 .build();
     }
 
-    public ServiceResponseDTO toServiceResponseDTO(Service service){
+    public ServiceResponseDTO toDTO(Service service){
         return ServiceResponseDTO.builder()
                 .id(service.getId())
                 .name(service.getName())

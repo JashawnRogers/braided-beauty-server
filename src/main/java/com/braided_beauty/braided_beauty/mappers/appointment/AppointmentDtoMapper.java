@@ -18,7 +18,7 @@ public class AppointmentDtoMapper {
                 .build();
     }
 
-    public AppointmentResponseDTO toAppointmentResponseDTO(Appointment appointment,
+    public AppointmentResponseDTO toDTO(Appointment appointment,
                                                            ServiceResponseDTO service,
                                                            AppointmentResponseDTO dto){
         return AppointmentResponseDTO.builder()

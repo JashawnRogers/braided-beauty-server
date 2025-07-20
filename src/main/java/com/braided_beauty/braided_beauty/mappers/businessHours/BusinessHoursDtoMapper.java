@@ -1,4 +1,4 @@
-package com.braided_beauty.braided_beauty.mappers.shared;
+package com.braided_beauty.braided_beauty.mappers.businessHours;
 
 import com.braided_beauty.braided_beauty.dtos.shared.BusinessHoursRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.shared.BusinessHoursResponseDTO;
@@ -17,7 +17,7 @@ public class BusinessHoursDtoMapper {
                 .build();
     }
 
-    public BusinessHoursResponseDTO toDto(BusinessHours dto){
+    public BusinessHoursResponseDTO toDTO(BusinessHours dto){
         return BusinessHoursResponseDTO.builder()
                 .id(dto.getId())
                 .dayOfWeek(dto.getDayOfWeek())

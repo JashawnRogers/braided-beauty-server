@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class LoyaltyRecordDtoMapper {
 
-    public LoyaltyRecordResponseDTO toLoyaltyRecordResponseDTO(LoyaltyRecord loyaltyRecord){
+    public LoyaltyRecordResponseDTO toDTO(LoyaltyRecord loyaltyRecord){
         return LoyaltyRecordResponseDTO.builder()
                 .points(loyaltyRecord.getPoints())
                 .redeemedPoints(loyaltyRecord.getRedeemedPoints())

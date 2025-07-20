@@ -18,7 +18,7 @@ public class UserGuestMapper {
                 .build();
     }
 
-    public UserGuestResponseDTO toUserGuestResponseDTO(User user, AppointmentResponseDTO appointment){
+    public UserGuestResponseDTO toDTO(User user, AppointmentResponseDTO appointment){
         return UserGuestResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())

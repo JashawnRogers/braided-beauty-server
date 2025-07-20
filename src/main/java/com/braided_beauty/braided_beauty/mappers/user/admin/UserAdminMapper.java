@@ -33,7 +33,7 @@ public class UserAdminMapper {
                 .build();
     }
 
-    public UserAdminAppointmentResponseDTO toUserAdminAppointmentResponseDTO(User user,
+    public UserAdminAppointmentResponseDTO toDTO(User user,
                                                                              Service service,
                                                                              Appointment appointment){
         return UserAdminAppointmentResponseDTO.builder()
@@ -47,7 +47,7 @@ public class UserAdminMapper {
                 .build();
     }
 
-    public UserAdminViewDTO toUserAdminViewDTO(UserAdminViewDTO dto,
+    public UserAdminViewDTO toDTO(UserAdminViewDTO dto,
                                                User user,
                                                AppointmentResponseDTO appointment,
                                                LoyaltyRecordResponseDTO loyaltyRecord){
@@ -66,7 +66,7 @@ public class UserAdminMapper {
                 .build();
     }
 
-    public UserSummaryResponseDTO toUserSummaryResponseDTO(User user, LoyaltyRecord loyaltyRecord){
+    public UserSummaryResponseDTO toDTO(User user, LoyaltyRecord loyaltyRecord){
         return UserSummaryResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
