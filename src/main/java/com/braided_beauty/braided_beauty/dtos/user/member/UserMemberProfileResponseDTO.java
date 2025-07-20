@@ -5,12 +5,14 @@ import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordRespons
 import com.braided_beauty.braided_beauty.enums.UserType;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
 import java.util.UUID;
 
+@Builder
 @AllArgsConstructor
 @Getter
 @Setter

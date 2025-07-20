@@ -3,9 +3,11 @@ package com.braided_beauty.braided_beauty.dtos.user.member;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+@Builder
 @AllArgsConstructor
 @Getter
 @Setter
