@@ -1,9 +1,11 @@
 package com.braided_beauty.braided_beauty.models;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -43,6 +45,16 @@ public class Appointment {
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
+
+    @Column(name = "deposit_amount")
+    private BigDecimal depositAmount;
+
+    @Column(name = "payment_status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
+
+    @Column(name = "stripe_payment_id")
+    private String stripePaymentId;
 
     @PrePersist
     protected void onCreate(){

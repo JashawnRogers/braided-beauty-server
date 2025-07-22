@@ -15,6 +15,7 @@ public class AppointmentDtoMapper {
                 .appointmentTime(dto.getAppointmentTime())
                 .id(dto.getServiceId())
                 .note(dto.getNote())
+                .stripePaymentId(dto.getStripePaymentId())
                 .build();
     }
 
@@ -27,6 +28,9 @@ public class AppointmentDtoMapper {
                 .appointmentStatus(appointment.getAppointmentStatus())
                 .createdAt(appointment.getCreatedAt())
                 .service(service)
+                .depositAmount(appointment.getDepositAmount())
+                .paymentStatus(appointment.getPaymentStatus())
+                .stripePaymentId(appointment.getStripePaymentId())
                 .pointsEarned(dto.getPointsEarned())
                 .updatedAt(appointment.getUpdatedAt())
                 .note(appointment.getNote())

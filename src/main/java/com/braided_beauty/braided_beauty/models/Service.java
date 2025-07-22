@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.models;
 
+import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,4 +37,7 @@ public class Service {
 
     @OneToMany(mappedBy = "service")
     private List<Appointment> appointments;
+
+    @Column(name = "deposit_amount", nullable = false)
+    private BigDecimal depositAmount;
 }

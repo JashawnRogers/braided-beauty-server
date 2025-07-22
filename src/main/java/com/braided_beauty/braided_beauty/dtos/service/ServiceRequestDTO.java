@@ -19,6 +19,8 @@ public class ServiceRequestDTO {
     @NotNull
     private final BigDecimal price;
     @NotNull
+    private final BigDecimal depositAmount;
+    @NotNull
     private final Integer durationMinutes;
     private String photoUrl;
     private String videoUrl;

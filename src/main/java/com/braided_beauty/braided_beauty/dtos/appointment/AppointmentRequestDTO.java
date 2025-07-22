@@ -17,4 +17,5 @@ public class AppointmentRequestDTO {
     @NotNull
     private final UUID serviceId;
     private final String note;
+    private final String stripePaymentId;
 }
