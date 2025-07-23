@@ -22,15 +22,10 @@ import org.springframework.stereotype.Service;
 @Service
 @AllArgsConstructor
 public class AppointmentService {
-    @Autowired
     private final AppointmentRepository appointmentRepository;
-    @Autowired
     private final AppointmentDtoMapper appointmentDtoMapper;
-    @Autowired
     private final ServiceDtoMapper serviceDtoMapper;
-    @Autowired
     private final ServiceRepository serviceRepository;
-    @Autowired
     private final PaymentService paymentService;
 
     public AppointmentResponseDTO createAppointment(AppointmentRequestDTO appointmentRequestDTO) throws StripeException {
@@ -49,7 +44,7 @@ public class AppointmentService {
 
         // Manually overriding mapped values to appointment because they are dependent on stripe and service
         // rather than the client
-        appointment.setServiceModel(service);
+        appointment.setService(service);
         appointment.setDepositAmount(service.getDepositAmount());
         appointment.setPaymentStatus(PaymentStatus.PENDING);
         appointment.setStripePaymentId(stripeResponse.getPaymentIntentId());

@@ -12,7 +12,6 @@ public class AppointmentDtoMapper {
     public Appointment toEntity(AppointmentRequestDTO dto){
         return Appointment.builder()
                 .appointmentTime(dto.getAppointmentTime())
-                .id(dto.getServiceId())
                 .note(dto.getNote())
                 .stripePaymentId(dto.getStripePaymentId())
                 .build();

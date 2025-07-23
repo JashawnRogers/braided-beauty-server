@@ -28,7 +28,7 @@ public class Appointment {
 
     @ManyToOne
     @JoinColumn(name = "service_id")
-    private ServiceModel serviceModel;
+    private ServiceModel service;
 
     @Column(name = "appointment_time", nullable = false, unique = true)
     private LocalDateTime appointmentTime;
