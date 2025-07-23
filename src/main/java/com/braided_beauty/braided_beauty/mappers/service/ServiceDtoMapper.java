@@ -2,14 +2,14 @@ package com.braided_beauty.braided_beauty.mappers.service;
 
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
-import com.braided_beauty.braided_beauty.models.Service;
+import com.braided_beauty.braided_beauty.models.ServiceModel;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ServiceDtoMapper {
 
-    public Service toEntity(ServiceRequestDTO dto){
-        return Service.builder()
+    public ServiceModel toEntity(ServiceRequestDTO dto){
+        return ServiceModel.builder()
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .price(dto.getPrice())
@@ -20,16 +20,16 @@ public class ServiceDtoMapper {
                 .build();
     }
 
-    public ServiceResponseDTO toDTO(Service service){
+    public ServiceResponseDTO toDTO(ServiceModel serviceModel){
         return ServiceResponseDTO.builder()
-                .id(service.getId())
-                .name(service.getName())
-                .description(service.getDescription())
-                .price(service.getPrice())
-                .depositAmount(service.getDepositAmount())
-                .durationMinutes(service.getDurationMinutes())
-                .photoUrl(service.getPhotoUrl())
-                .videoUrl(service.getVideoUrl())
+                .id(serviceModel.getId())
+                .name(serviceModel.getName())
+                .description(serviceModel.getDescription())
+                .price(serviceModel.getPrice())
+                .depositAmount(serviceModel.getDepositAmount())
+                .durationMinutes(serviceModel.getDurationMinutes())
+                .photoUrl(serviceModel.getPhotoUrl())
+                .videoUrl(serviceModel.getVideoUrl())
                 .build();
     }
 }

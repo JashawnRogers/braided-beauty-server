@@ -16,6 +16,7 @@ public class ServiceResponseDTO {
     private final BigDecimal price;
     private final BigDecimal depositAmount;
     private final Integer durationMinutes;
+    private final Integer pointsEarned;
     private String photoUrl;
     private String videoUrl;
 }

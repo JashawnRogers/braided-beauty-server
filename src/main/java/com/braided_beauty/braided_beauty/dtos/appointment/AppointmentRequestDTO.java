@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.appointment;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,6 +17,9 @@ public class AppointmentRequestDTO {
     private final LocalDateTime appointmentTime;
     @NotNull
     private final UUID serviceId;
+    @Email
+    @NotNull
+    private final String receiptEmail;
     private final String note;
     private final String stripePaymentId;
 }

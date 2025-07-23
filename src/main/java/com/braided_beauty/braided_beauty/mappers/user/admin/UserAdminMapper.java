@@ -5,7 +5,7 @@ import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordRespons
 import com.braided_beauty.braided_beauty.dtos.user.admin.*;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
-import com.braided_beauty.braided_beauty.models.Service;
+import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
 import org.springframework.stereotype.Component;
 
@@ -15,12 +15,12 @@ import java.util.stream.Collectors;
 public class UserAdminMapper {
 
     public Appointment toEntity(UserAdminAppointmentsRequestDTO dto,
-                                                         Service service,
+                                                         ServiceModel serviceModel,
                                                          User user){
         return Appointment.builder()
                 .id(dto.getAppointmentId())
                 .user(user)
-                .service(service)
+                .serviceModel(serviceModel)
                 .appointmentTime(dto.getAppointmentTime())
                 .appointmentStatus(dto.getAppointmentStatus())
                 .note(dto.getNotes())
@@ -34,11 +34,11 @@ public class UserAdminMapper {
     }
 
     public UserAdminAppointmentResponseDTO toDTO(User user,
-                                                                             Service service,
+                                                                             ServiceModel serviceModel,
                                                                              Appointment appointment){
         return UserAdminAppointmentResponseDTO.builder()
                 .id(user.getId())
-                .serviceId(service.getId())
+                .serviceId(serviceModel.getId())
                 .appointmentTime(appointment.getAppointmentTime())
                 .appointmentStatus(appointment.getAppointmentStatus())
                 .createdAt(appointment.getCreatedAt())

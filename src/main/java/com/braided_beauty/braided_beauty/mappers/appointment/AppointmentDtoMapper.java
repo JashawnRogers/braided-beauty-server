@@ -4,7 +4,6 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.Service;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,8 +19,7 @@ public class AppointmentDtoMapper {
     }
 
     public AppointmentResponseDTO toDTO(Appointment appointment,
-                                                           ServiceResponseDTO service,
-                                                           AppointmentResponseDTO dto){
+                                                           ServiceResponseDTO service){
         return AppointmentResponseDTO.builder()
                 .id(appointment.getId())
                 .appointmentTime(appointment.getAppointmentTime())
@@ -31,7 +29,7 @@ public class AppointmentDtoMapper {
                 .depositAmount(appointment.getDepositAmount())
                 .paymentStatus(appointment.getPaymentStatus())
                 .stripePaymentId(appointment.getStripePaymentId())
-                .pointsEarned(dto.getPointsEarned())
+                .pointsEarned(service.getPointsEarned())
                 .updatedAt(appointment.getUpdatedAt())
                 .note(appointment.getNote())
                 .build();

@@ -1,6 +1,5 @@
 package com.braided_beauty.braided_beauty.models;
 
-import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -15,7 +14,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Builder
-public class Service {
+public class ServiceModel {
     @Id
     @GeneratedValue
     private UUID id;
@@ -35,9 +34,12 @@ public class Service {
     @Column(name = "video_url")
     private String videoUrl;
 
-    @OneToMany(mappedBy = "service")
+    @OneToMany(mappedBy = "serviceModel")
     private List<Appointment> appointments;
 
     @Column(name = "deposit_amount", nullable = false)
     private BigDecimal depositAmount;
+
+    @Column(name ="points_earned", nullable = false)
+    private Integer pointsEarned;
 }
