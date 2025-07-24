@@ -9,23 +9,20 @@ import com.stripe.model.PaymentIntent;
 import com.stripe.param.PaymentIntentCreateParams;
 import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
-import lombok.Value;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import java.lang.String;
 
 @AllArgsConstructor
 @Service
 public class PaymentService {
-    @Autowired
     private final PaymentDtoMapper paymentDtoMapper;
-    private String stripeApiKey;
-
-    @PostConstruct
-    public void init(){
-        Stripe.apiKey = stripeApiKey;
-    }
+//    private String stripeApiKey;
+//
+//    @PostConstruct
+//    public void init(){
+//        Stripe.apiKey = stripeApiKey;
+//    }
 
     public PaymentIntentResponseDTO createPaymentIntent(PaymentIntentRequestDTO dto) throws StripeException {
         PaymentIntentCreateParams createParams = paymentDtoMapper.toStripeParams(dto);

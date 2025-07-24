@@ -3,7 +3,6 @@ package com.braided_beauty.braided_beauty.models;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -46,7 +45,7 @@ public class User {
     @OneToMany(mappedBy = "user")
     private List<Appointment> appointments;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private LoyaltyRecord loyaltyRecord;
 
     @PrePersist

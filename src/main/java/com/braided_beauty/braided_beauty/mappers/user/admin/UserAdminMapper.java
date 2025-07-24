@@ -20,7 +20,7 @@ public class UserAdminMapper {
         return Appointment.builder()
                 .id(dto.getAppointmentId())
                 .user(user)
-                .serviceModel(serviceModel)
+                .service(serviceModel)
                 .appointmentTime(dto.getAppointmentTime())
                 .appointmentStatus(dto.getAppointmentStatus())
                 .note(dto.getNotes())

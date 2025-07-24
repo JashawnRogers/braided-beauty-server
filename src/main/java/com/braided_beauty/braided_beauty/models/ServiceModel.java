@@ -34,7 +34,7 @@ public class ServiceModel {
     @Column(name = "video_url")
     private String videoUrl;
 
-    @OneToMany(mappedBy = "serviceModel")
+    @OneToMany(mappedBy = "service")
     private List<Appointment> appointments;
 
     @Column(name = "deposit_amount", nullable = false)
