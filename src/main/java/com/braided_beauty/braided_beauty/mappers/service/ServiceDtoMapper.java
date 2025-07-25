@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.mappers.service;
 
+import com.braided_beauty.braided_beauty.dtos.service.ServicePatchDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
@@ -31,5 +32,15 @@ public class ServiceDtoMapper {
                 .photoUrl(serviceModel.getPhotoUrl())
                 .videoUrl(serviceModel.getVideoUrl())
                 .build();
+    }
+
+    public void updateServiceFromPatchDTO(ServicePatchDTO dto, ServiceModel service) {
+        if (dto.getName() != null) service.setName(dto.getName());
+        if (dto.getDescription() != null) service.setDescription(dto.getDescription());
+        if (dto.getPrice() != null) service.setPrice(dto.getPrice());
+        if (dto.getDepositAmount() != null) service.setDepositAmount(dto.getDepositAmount());
+        if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
+        if (dto.getPhotoUrl() != null) service.setPhotoUrl(dto.getPhotoUrl());
+        if (dto.getVideoUrl() != null) service.setVideoUrl(dto.getVideoUrl());
     }
 }

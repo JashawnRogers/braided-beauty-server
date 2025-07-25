@@ -1,8 +1,10 @@
 package com.braided_beauty.braided_beauty.dtos.service;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,15 +14,15 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 public class ServiceRequestDTO {
-    @NotNull
+    @NotBlank(message = "Service name is required.")
     private final String name;
-    @NotNull
+    @NotBlank(message = "Service must have a description.")
     private final String Description;
-    @NotNull
+    @PositiveOrZero(message = "Price must be zero or more.")
     private final BigDecimal price;
-    @NotNull
+    @PositiveOrZero(message = "Deposit must be zero or more.")
     private final BigDecimal depositAmount;
-    @NotNull
+    @Positive(message = "Duration of service must be greater than zero.")
     private final Integer durationMinutes;
     private String photoUrl;
     private String videoUrl;
