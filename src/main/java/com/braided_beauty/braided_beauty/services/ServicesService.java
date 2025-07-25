@@ -15,10 +15,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.toList;
-
 
 @Service
 @AllArgsConstructor
@@ -37,7 +33,7 @@ public class ServicesService {
         return serviceDtoMapper.toDTO(newService);
     }
 
-    public void deleteService(UUID serviceId){
+    public void deleteServiceById(UUID serviceId){
         ServiceModel serviceToDelete = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
         serviceRepository.delete(serviceToDelete);
