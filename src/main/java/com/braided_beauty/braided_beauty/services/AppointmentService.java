@@ -1,11 +1,13 @@
 package com.braided_beauty.braided_beauty.services;
 
+import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.payment.PaymentIntentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.payment.PaymentIntentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.mappers.payment.PaymentDtoMapper;
@@ -19,6 +21,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Service
 @AllArgsConstructor
 public class AppointmentService {
@@ -27,10 +32,20 @@ public class AppointmentService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final ServiceRepository serviceRepository;
     private final PaymentService paymentService;
+    private final SchedulingConfig schedulingConfig;
 
     public AppointmentResponseDTO createAppointment(AppointmentRequestDTO appointmentRequestDTO) throws StripeException {
         ServiceModel service = serviceRepository.findById(appointmentRequestDTO.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
+
+        int bufferMinutes = schedulingConfig.getBufferMinutes();
+        LocalDateTime start = appointmentRequestDTO.getAppointmentTime();
+        LocalDateTime end = start.plusMinutes(service.getDurationMinutes() + bufferMinutes);
+        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
+        if (!conflicts.isEmpty()){
+            throw new ConflictException("This time overlaps with another appointment.");
+        }
+
         ServiceResponseDTO serviceResponseDTO = serviceDtoMapper.toDTO(service);
 
         PaymentIntentRequestDTO paymentDto = PaymentIntentRequestDTO.builder()
