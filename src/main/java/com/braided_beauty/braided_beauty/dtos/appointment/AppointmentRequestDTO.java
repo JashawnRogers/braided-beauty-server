@@ -22,4 +22,5 @@ public class AppointmentRequestDTO {
     private final String receiptEmail;
     private final String note;
     private final String stripePaymentId;
+    private final String cancelReason;
 }

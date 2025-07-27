@@ -1,7 +1,7 @@
 package com.braided_beauty.braided_beauty.exceptions;
 
-public class ConflictException extends RuntimeException {
-    public ConflictException(String message){
+public class UnauthorizedException extends RuntimeException {
+    public UnauthorizedException(String message){
         super(message);
     }
 }

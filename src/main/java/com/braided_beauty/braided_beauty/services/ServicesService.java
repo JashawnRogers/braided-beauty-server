@@ -37,7 +37,7 @@ public class ServicesService {
         ServiceModel serviceToDelete = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
         serviceRepository.delete(serviceToDelete);
-        log.info("Deleting service with ID: {}, ", serviceId);
+        log.info("Deleting service with ID: {} ", serviceId);
     }
 
     public ServiceResponseDTO updateService(UUID serviceId, ServicePatchDTO servicePatchDTO){
