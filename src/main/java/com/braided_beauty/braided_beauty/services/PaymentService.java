@@ -6,7 +6,9 @@ import com.braided_beauty.braided_beauty.mappers.payment.PaymentDtoMapper;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.Refund;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.RefundCreateParams;
 import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,5 +30,12 @@ public class PaymentService {
         PaymentIntentCreateParams createParams = paymentDtoMapper.toStripeParams(dto);
         PaymentIntent paymentIntent = PaymentIntent.create(createParams);
         return paymentDtoMapper.toDto(paymentIntent);
+    }
+
+    public void issueRefund(String paymentIntentId) throws StripeException {
+        RefundCreateParams params = RefundCreateParams.builder()
+                .setPaymentIntent(paymentIntentId)
+                .build();
+        Refund.create(params);
     }
 }
