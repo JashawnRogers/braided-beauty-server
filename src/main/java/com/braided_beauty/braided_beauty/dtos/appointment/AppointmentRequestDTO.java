@@ -13,12 +13,12 @@ import java.util.UUID;
 @Getter
 @Setter
 public class AppointmentRequestDTO {
-    @NotNull
+    @NotNull(message = "Appointment must have a time.")
     private final LocalDateTime appointmentTime;
-    @NotNull
+    @NotNull(message = "appointment must be linked to a service.")
     private final UUID serviceId;
     @Email
-    @NotNull
+    @NotNull(message = "Must provide email.")
     private final String receiptEmail;
     private final String note;
     private final String stripePaymentId;
