@@ -20,13 +20,18 @@ import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.stripe.exception.StripeException;
 import lombok.AllArgsConstructor;
+import org.apache.coyote.BadRequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.toList;
 
 @Service
 @AllArgsConstructor
@@ -76,7 +81,7 @@ public class AppointmentService {
         return appointmentDtoMapper.toDTO(saved, serviceResponseDTO);
     }
 
-    public void cancelAppointment(CancelAppointmentDTO dto) throws StripeException {
+    public AppointmentResponseDTO cancelAppointment(CancelAppointmentDTO dto) throws StripeException {
         UUID appointmentId = dto.getAppointmentId();
         UUID userId = dto.getUserId();
         String reason = dto.getCancelReason();
@@ -87,12 +92,16 @@ public class AppointmentService {
             throw new UnauthorizedException("You can't cancel someone else's appointment.");
         }
 
+        //Created so that I can have a service dto to return the appt response dto
+        ServiceModel service = serviceRepository.findById(canceledAppointment.getService().getId())
+                .orElseThrow(() -> new NotFoundException("Service not found."));
+
         if (canceledAppointment.getAppointmentStatus() == AppointmentStatus.CANCELED){
             throw new ConflictException("Appointment already canceled");
         }
 
         if (canceledAppointment.getAppointmentStatus() == AppointmentStatus.COMPLETED) {
-            throw new ConflictException("Can't cancel a previously completed appointment");
+            throw new ConflictException("Can't cancel a previously completed appointment.");
         }
 
         if (canceledAppointment.getPaymentStatus() == PaymentStatus.COMPLETED) {
@@ -112,5 +121,28 @@ public class AppointmentService {
 
         log.info("Canceled appointment with ID: {}, Reason: {}", appointmentId, reason);
         appointmentRepository.save(canceledAppointment);
+
+        return appointmentDtoMapper.toDTO(canceledAppointment, serviceDtoMapper.toDTO(service));
+    }
+
+    public AppointmentResponseDTO getAppointmentById(UUID appointmentId){
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new NotFoundException("Appointment not found."));
+        log.info("Retrieved service with ID: {}", appointment.getId());
+        return appointmentDtoMapper.toDTO(appointment, serviceDtoMapper.toDTO(appointment.getService()));
+    }
+
+    public List<AppointmentResponseDTO> getAllAppointments(LocalDate date){
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+
+        List<Appointment> appointments = appointmentRepository
+                .findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(start, end);
+
+        return appointments.stream()
+                .map(appointment ->
+                    appointmentDtoMapper.toDTO(appointment, serviceDtoMapper.toDTO(appointment.getService()))
+                )
+                .toList();
     }
 }

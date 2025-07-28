@@ -25,4 +25,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                                                   @Param("desiredEnd") LocalDateTime desiredEnd,
                                                   @Param("bufferMinutes") int bufferMinutes
                                                   );
+
+    List<Appointment> findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(LocalDateTime start, LocalDateTime end);
 }
