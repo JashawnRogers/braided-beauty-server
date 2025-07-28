@@ -4,13 +4,22 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
+import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
+import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
+import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.User;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
-public class UserMemberMapper {
+@AllArgsConstructor
+public class UserMemberDtoMapper {
+    private final AppointmentDtoMapper appointmentDtoMapper;
+    private final ServiceDtoMapper serviceDtoMapper;
+    private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
 
     public User toEntity(UserMemberRequestDTO dto){
         return User.builder()
@@ -19,9 +28,7 @@ public class UserMemberMapper {
                 .build();
     }
 
-    public UserMemberProfileResponseDTO toDTO(AppointmentResponseDTO appointment,
-                                                                       User user,
-                                                                       LoyaltyRecordResponseDTO loyaltyRecord){
+    public UserMemberProfileResponseDTO toDTO(User user){
         return UserMemberProfileResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -29,10 +36,10 @@ public class UserMemberMapper {
                 .phoneNumber(user.getPhoneNumber())
                 .appointments(user.getAppointments()
                         .stream()
-                        .map(appt -> appointment)
+                        .map(appt -> appointmentDtoMapper.toDTO(appt, serviceDtoMapper.toDTO(appt.getService())))
                         .collect(Collectors.toList())
                 )
-                .loyalty(loyaltyRecord)
+                .loyalty(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
                 .build();
     }
 }
