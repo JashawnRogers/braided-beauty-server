@@ -48,6 +48,9 @@ public class User {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private LoyaltyRecord loyaltyRecord;
 
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

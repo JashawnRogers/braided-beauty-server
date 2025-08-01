@@ -56,6 +56,9 @@ public class Appointment {
     @Column(name = "stripe_payment_id")
     private String stripePaymentId;
 
+    @Column(name = "stripe_session_id")
+    private String stripeSessionId;
+
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
