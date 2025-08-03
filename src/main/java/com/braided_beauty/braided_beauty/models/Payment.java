@@ -5,11 +5,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
+@AllArgsConstructor
+@Getter
+@Setter
 public class Payment {
     @Id
     private UUID id;

@@ -122,7 +122,7 @@ public class AppointmentService {
             throw new UnauthorizedException("You can't cancel someone else's appointment.");
         }
 
-        //Created so that I can have a service dto to return the appt response dto
+        //Created so that I can have a service dto to return the apt response dto
         ServiceModel service = serviceRepository.findById(canceledAppointment.getService().getId())
                 .orElseThrow(() -> new NotFoundException("Service not found."));
 
