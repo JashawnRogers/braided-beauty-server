@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -58,11 +59,15 @@ public class AppointmentService {
 
         Appointment appointment = appointmentDtoMapper.toEntity(appointmentRequestDTO);
         List<AddOn> addOnIds = addOnService.getAddOnIds(appointmentRequestDTO.getAddOnIds());
-        appointment.
+        appointment.setAddOns(addOnIds);
         appointment.setService(service);
         appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
         appointment.setDepositAmount(service.getDepositAmount());
         appointment.setPaymentStatus(PaymentStatus.PENDING);
+
+        String addOnMetadata = addOnIds.stream()
+                .map(addOn -> addOn.getId().toString())
+                .collect(Collectors.joining(","));
 
         // Save the appointment so it gets an ID (needed for Stripe metadata)
         Appointment saved = appointmentRepository.save(appointment);
@@ -92,8 +97,9 @@ public class AppointmentService {
                                 .build()
                 )
                 .putMetadata("appointmentId", appointmentId)
-                        .putMetadata("userId", userId)
-                                .build();
+                .putMetadata("userId", userId)
+                .putMetadata("addOnIds", addOnMetadata)
+                .build();
 
         Session session = Session.create(params);
 

@@ -14,6 +14,7 @@ import java.util.UUID;
 @Setter
 @EqualsAndHashCode(exclude = "appointments") // To prevent circular dependencies in Java
 @ToString(exclude = "appointments") // To prevent circular dependencies in Java
+@Builder
 public class AddOn {
     @Id
     @GeneratedValue
