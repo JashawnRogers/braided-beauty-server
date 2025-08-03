@@ -43,7 +43,7 @@ public class AppointmentController {
     public ResponseEntity<List<AppointmentResponseDTO>> getAllAppointmentsByDate(@RequestParam("date")
                                                                                      @org.springframework.format.annotation.DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                                                                                      LocalDate date){
-        List<AppointmentResponseDTO> appointments = appointmentService.getAllAppointments(date);
+        List<AppointmentResponseDTO> appointments = appointmentService.getAllAppointmentsByDate(date);
         return ResponseEntity.ok(appointments);
     }
 }

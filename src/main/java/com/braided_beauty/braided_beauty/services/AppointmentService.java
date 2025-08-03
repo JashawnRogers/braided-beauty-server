@@ -12,6 +12,7 @@ import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
@@ -38,6 +39,7 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final AppointmentDtoMapper appointmentDtoMapper;
     private final ServiceRepository serviceRepository;
+    private final AddOnService addOnService;
     private final PaymentService paymentService;
     private final SchedulingConfig schedulingConfig;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
@@ -55,6 +57,8 @@ public class AppointmentService {
         }
 
         Appointment appointment = appointmentDtoMapper.toEntity(appointmentRequestDTO);
+        List<AddOn> addOnIds = addOnService.getAddOnIds(appointmentRequestDTO.getAddOnIds());
+        appointment.
         appointment.setService(service);
         appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
         appointment.setDepositAmount(service.getDepositAmount());

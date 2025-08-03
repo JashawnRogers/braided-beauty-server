@@ -19,12 +19,6 @@ import java.lang.String;
 @Service
 public class PaymentService {
     private final PaymentDtoMapper paymentDtoMapper;
-//    private String stripeApiKey;
-//
-//    @PostConstruct
-//    public void init(){
-//        Stripe.apiKey = stripeApiKey;
-//    }
 
     public PaymentIntentResponseDTO createPaymentIntent(PaymentIntentRequestDTO dto) throws StripeException {
         PaymentIntentCreateParams createParams = paymentDtoMapper.toStripeParams(dto);

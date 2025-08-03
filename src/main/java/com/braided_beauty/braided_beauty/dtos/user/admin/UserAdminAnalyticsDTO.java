@@ -1,24 +1,26 @@
 package com.braided_beauty.braided_beauty.dtos.user.admin;
 
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.service.PopularServiceDTO;
+import com.braided_beauty.braided_beauty.models.Appointment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Builder
 @AllArgsConstructor
 @Getter
 @Setter
 public class UserAdminAnalyticsDTO {
-    private final int totalAppointmentsThisMonth;
+    private final List<AppointmentResponseDTO> totalAppointmentsByMonth;
     private final int totalAppointmentsAllTime;
-    private final int uniqueClientsThisMonth;
-    private final String mostPopularServiceName;
-    private final int mostPopularServiceCount;
+    private final List<UserSummaryResponseDTO> uniqueClientsThisMonth;
+    private final PopularServiceDTO mostPopularService;
     private final BigDecimal totalRevenueThisMonth;
     private final BigDecimal totalRevenueAllTime;
-    private final int activeLoyaltyMembers;
-    private final double avgAppointmentsPerClient;
+    private final int totalLoyaltyMembers;
 }

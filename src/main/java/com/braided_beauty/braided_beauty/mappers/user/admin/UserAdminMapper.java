@@ -3,16 +3,20 @@ package com.braided_beauty.braided_beauty.mappers.user.admin;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.*;
+import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
 
 @Component
+@AllArgsConstructor
 public class UserAdminMapper {
+    private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
 
     public Appointment toEntity(UserAdminAppointmentsRequestDTO dto,
                                                          ServiceModel serviceModel,
@@ -33,7 +37,7 @@ public class UserAdminMapper {
                 .build();
     }
 
-    public UserAdminAppointmentResponseDTO toDTO(User user,
+    public UserAdminAppointmentResponseDTO toAppointmentDTO(User user,
                                                                              ServiceModel serviceModel,
                                                                              Appointment appointment){
         return UserAdminAppointmentResponseDTO.builder()
@@ -47,33 +51,14 @@ public class UserAdminMapper {
                 .build();
     }
 
-    public UserAdminViewDTO toDTO(UserAdminViewDTO dto,
-                                               User user,
-                                               AppointmentResponseDTO appointment,
-                                               LoyaltyRecordResponseDTO loyaltyRecord){
-        return UserAdminViewDTO.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .createdAt(user.getCreatedAt())
-                .phoneNumber(user.getPhoneNumber())
-                .appointments(user.getAppointments()
-                        .stream()
-                        .map(appt -> appointment)
-                        .collect(Collectors.toList())
-                )
-                .loyaltyRecord(loyaltyRecord)
-                .build();
-    }
-
-    public UserSummaryResponseDTO toDTO(User user, LoyaltyRecord loyaltyRecord){
+    public UserSummaryResponseDTO toSummaryDTO(User user){
         return UserSummaryResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .userType(user.getUserType())
                 .createdAt(user.getCreatedAt())
-                .loyaltyPoints(loyaltyRecord.getPoints())
+                .loyaltyPoints(user.getLoyaltyRecord().getPoints())
                 .build();
     }
 }

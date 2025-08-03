@@ -6,5 +6,6 @@ public enum AppointmentStatus {
     CONFIRMED,
     CANCELED,
     COMPLETED,
-    RESCHEDULED
+    PAYMENT_FAILED,
+    PAYMENT_IN_PROGRESS
 }

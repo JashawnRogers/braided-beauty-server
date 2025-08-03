@@ -36,7 +36,7 @@ public class UserMemberDtoMapper {
                 .phoneNumber(user.getPhoneNumber())
                 .appointments(user.getAppointments()
                         .stream()
-                        .map(appt -> appointmentDtoMapper.toDTO(appt, serviceDtoMapper.toDTO(appt.getService())))
+                        .map(appt -> appointmentDtoMapper.toDTO(appt))
                         .collect(Collectors.toList())
                 )
                 .loyalty(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))

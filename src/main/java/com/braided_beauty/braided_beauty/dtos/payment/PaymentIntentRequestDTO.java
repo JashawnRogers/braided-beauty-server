@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @Builder
 @AllArgsConstructor
@@ -18,6 +19,8 @@ public class PaymentIntentRequestDTO {
     @NotNull
     private final String currency;
     @NotNull
-    private String receiptEmail;
+    private final String receiptEmail;
+    @NotNull
+    private final Map<String, String> metadata;
 
 }

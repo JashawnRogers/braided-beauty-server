@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -23,4 +24,5 @@ public class AppointmentRequestDTO {
     private final String note;
     private final String stripePaymentId;
     private final String cancelReason;
+    private final List<UUID> addOnIds;
 }

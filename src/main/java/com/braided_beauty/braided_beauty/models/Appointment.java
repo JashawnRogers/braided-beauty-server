@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -61,6 +62,14 @@ public class Appointment {
 
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
+
+    @ManyToMany
+    @JoinTable(
+            name = "appointment_add_ons", // Name of the join table
+            joinColumns = @JoinColumn(name = "appointment_id"), // Name of join table column and foreign key to appointment entity
+            inverseJoinColumns = @JoinColumn(name = "add_on_id") //Name of join table column and foreign key to add on entity
+    )
+    private List<AddOn> addOns;
 
     @PrePersist
     protected void onCreate(){
