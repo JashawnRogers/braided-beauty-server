@@ -3,6 +3,7 @@ package com.braided_beauty.braided_beauty.dtos.appointment;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +12,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Builder
@@ -28,5 +30,6 @@ public class AppointmentResponseDTO {
     private final String stripePaymentId;
     private final Integer pointsEarned;
     private final LocalDateTime updatedAt;
+    private final List<AddOn> addOns;
     private final String note;
 }

@@ -34,6 +34,7 @@ public class AppointmentDtoMapper {
                 .pointsEarned(serviceDtoMapper.toDTO(appointment.getService()).getPointsEarned())
                 .updatedAt(appointment.getUpdatedAt())
                 .note(appointment.getNote())
+                .addOns(appointment.getAddOns())
                 .build();
     }
 }

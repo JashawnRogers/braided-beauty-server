@@ -58,14 +58,14 @@ public class AppointmentService {
         }
 
         Appointment appointment = appointmentDtoMapper.toEntity(appointmentRequestDTO);
-        List<AddOn> addOnIds = addOnService.getAddOnIds(appointmentRequestDTO.getAddOnIds());
-        appointment.setAddOns(addOnIds);
+        List<AddOn> addOns = addOnService.getAddOnIds(appointmentRequestDTO.getAddOnIds());
+        appointment.setAddOns(addOns);
         appointment.setService(service);
         appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
         appointment.setDepositAmount(service.getDepositAmount());
         appointment.setPaymentStatus(PaymentStatus.PENDING);
 
-        String addOnMetadata = addOnIds.stream()
+        String addOnMetadata = addOns.stream()
                 .map(addOn -> addOn.getId().toString())
                 .collect(Collectors.joining(","));
 
