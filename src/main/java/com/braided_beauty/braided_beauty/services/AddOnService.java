@@ -17,7 +17,6 @@ import java.util.UUID;
 @Setter
 public class AddOnService {
     private final AddOnRepository addOnRepository;
-    private final AppointmentRequestDTO appointmentRequestDTO;
 
     public List<AddOn> getAddOnIds(List<UUID> ids){
        if (ids == null || ids.isEmpty()){
