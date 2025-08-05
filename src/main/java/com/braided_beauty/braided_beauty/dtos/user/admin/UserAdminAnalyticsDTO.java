@@ -2,7 +2,6 @@ package com.braided_beauty.braided_beauty.dtos.user.admin;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.service.PopularServiceDTO;
-import com.braided_beauty.braided_beauty.models.Appointment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
