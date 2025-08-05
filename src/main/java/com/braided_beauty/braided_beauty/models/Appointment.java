@@ -50,6 +50,9 @@ public class Appointment {
     @Column(name = "deposit_amount")
     private BigDecimal depositAmount;
 
+    @Column(name = "tip_amount")
+    private BigDecimal tipAmount;
+
     @Column(name = "payment_status", nullable = false)
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;

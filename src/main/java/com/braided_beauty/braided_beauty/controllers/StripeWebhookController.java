@@ -4,7 +4,11 @@ package com.braided_beauty.braided_beauty.controllers;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
+import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
+import com.braided_beauty.braided_beauty.services.PaymentService;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.model.Event;
@@ -19,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,20 +35,18 @@ public class StripeWebhookController {
     private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
 
     private final String webhookSecret;
-    private final AppointmentRepository appointmentRepository;
+    private final PaymentService paymentService;
 
     public StripeWebhookController(@Value("${stripe.webhook.secret}") String webhookSecret,
-                                   AppointmentRepository appointmentRepository) {
+                                   PaymentService paymentService) {
         this.webhookSecret = webhookSecret;
-        this.appointmentRepository = appointmentRepository;
+        this.paymentService = paymentService;
     }
 
     private static final Set<String> ALLOWED_EVENTS = Set.of(
             "checkout.session.completed",      // confirms user completed checkout
-            "payment_intent.succeeded",        // backup check — but session is better
-            "payment_intent.payment_failed",   // payment failed
-            "payment_intent.canceled",         // customer closed checkout before completing
-            "checkout.session.expired"         // checkout session timed out
+            "payment_intent.payment_failed"   // payment failed
+
     );
 
     @PostMapping
@@ -64,55 +67,30 @@ public class StripeWebhookController {
         }
 
        switch (event.getType()) {
-            case "checkout.session.completed" -> handleCheckoutCompleted(event);
-            case "payment_intent.payment_failed" -> handlePaymentFailed(event);
+          case "checkout.session.completed" -> {
+              Session session = (Session) event.getDataObjectDeserializer()
+                      .getObject()
+                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize session object."));
+
+              String paymentType = session.getMetadata().get("paymentType");
+
+              if ("deposit".equals(paymentType)){
+                  paymentService.handleDepositCheckoutCompleted(session);
+                  log.info("Deposit success.");
+              } else if ("final".equals(paymentType)) {
+                  paymentService.handleFinalCheckoutCompleted(session);
+                  log.info("Final payment success");
+              }
+          }
+          case "payment_intent.payment_failed" -> {
+              Session session = (Session) event.getDataObjectDeserializer()
+                              .getObject()
+                                      .orElseThrow(() -> new NotFoundException("Session object not found."));
+              paymentService.handlePaymentFailed(session);
+              log.warn("Payment failed: {}", session);
+          }
        }
 
-        return ResponseEntity.ok("{received : true}");
-    }
-
-    private void handleCheckoutCompleted(Event event){
-        Session session = (Session) event.getDataObjectDeserializer()
-                .getObject()
-                .orElseThrow(() -> new NotFoundException("Checkout session not found."));
-
-        String appointmentId = session.getMetadata().get("appointmentId");
-        if (appointmentId == null) {
-            log.warn("No appointmentId found in session metadata.");
-            return;
-        }
-
-        appointmentRepository.findById(UUID.fromString(appointmentId))
-                .ifPresent(appointment ->  {
-                    if (appointment.getPaymentStatus() == PaymentStatus.SUCCEEDED) {
-                        log.warn("Appointment {} already marked as paid. Skipping.", appointmentId);
-                        return;
-                    }
-
-                    appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-                    appointment.setPaymentStatus(PaymentStatus.SUCCEEDED);
-                    appointmentRepository.save(appointment);
-                    log.info("Appointment {} marked as COMPLETED.", appointmentId);
-                });
-    }
-
-    private void handlePaymentFailed(Event event){
-        PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
-                .getObject()
-                .orElseThrow(() -> new NotFoundException("Payment intent not found."));
-
-        String appointmentId = paymentIntent.getMetadata().get("appointmentId");
-
-        if (appointmentId != null){
-            appointmentRepository.findById(UUID.fromString(appointmentId))
-                    .ifPresent(appointment -> {
-                        appointment.setAppointmentStatus(AppointmentStatus.PAYMENT_FAILED);
-                        appointment.setPaymentStatus(PaymentStatus.FAILED);
-                        appointmentRepository.save(appointment);
-                        log.info("Appointment {} marked as PAYMENT_FAILED.", appointmentId);
-                    });
-        } else {
-            log.warn("No appointment ID found in metadata.");
-        }
+        return ResponseEntity.ok("{\"received\" : true}");
     }
 }

@@ -1,23 +1,21 @@
 package com.braided_beauty.braided_beauty.models;
 
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
 @AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
+@Builder
 public class Payment {
     @Id
+    @GeneratedValue
     private UUID id;
     @Column(name = "stripe_session_id")
     private String stripeSessionId;
