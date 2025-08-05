@@ -1,31 +1,22 @@
 package com.braided_beauty.braided_beauty.controllers;
 
 
-import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
-import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.Payment;
-import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
-import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.braided_beauty.braided_beauty.services.PaymentService;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.model.Event;
 import com.stripe.exception.SignatureVerificationException;
 
-import com.stripe.model.PaymentIntent;
-import lombok.AllArgsConstructor;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.Set;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/webhook/stripe")
