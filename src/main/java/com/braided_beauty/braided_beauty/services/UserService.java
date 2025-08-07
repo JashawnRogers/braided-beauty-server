@@ -8,11 +8,14 @@ import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
+import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.mappers.user.admin.UserAdminMapper;
 import com.braided_beauty.braided_beauty.mappers.user.member.UserMemberDtoMapper;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,8 +32,10 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final AppointmentRepository appointmentRepository;
+    private final ServiceRepository serviceRepository;
     private final UserMemberDtoMapper userMemberDtoMapper;
     private final AppointmentDtoMapper appointmentDtoMapper;
+    private final ServiceDtoMapper serviceDtoMapper;
     private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
     private final UserAdminMapper userAdminMapper;
 
@@ -79,9 +84,8 @@ public class UserService {
                 .map(userAdminMapper::toSummaryDTO)
                 .toList();
 
-        // In order to get most popular service, I need to refactor appointments to increment services count
-        // And this needs to be incremented upon service completion
-
+        ServiceModel mostPopularService = serviceRepository.findTopByOrderByTimesBookedDesc()
+                .orElseThrow(() -> new NotFoundException("Service not found."));
 
         int loyaltyMembers = userRepository.findAllByUserType(UserType.MEMBER).size();
 
@@ -89,9 +93,7 @@ public class UserService {
                 .totalAppointmentsByMonth(appointmentsByMonth)
                 .totalAppointmentsAllTime(totalAppointmentsAllTime)
                 .uniqueClientsThisMonth(newUsersThisMonth)
-                .mostPopularService(null)
-                .totalRevenueThisMonth(null)
-                .totalRevenueAllTime(null)
+                .mostPopularService(serviceDtoMapper.toDto(mostPopularService))
                 .totalLoyaltyMembers(loyaltyMembers)
                 .build();
     }

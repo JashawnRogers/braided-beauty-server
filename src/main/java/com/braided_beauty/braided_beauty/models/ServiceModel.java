@@ -42,4 +42,7 @@ public class ServiceModel {
 
     @Column(name ="points_earned", nullable = false)
     private Integer pointsEarned;
+
+    @Column(name = "times_booked")
+    private Integer timesBooked;
 }

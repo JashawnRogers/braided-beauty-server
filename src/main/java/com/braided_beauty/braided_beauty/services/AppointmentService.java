@@ -71,6 +71,9 @@ public class AppointmentService {
         appointment.setStripeSessionId(session.getId());
         appointmentRepository.save(saved);
 
+        service.setTimesBooked(+1);
+        serviceRepository.save(service);
+
         return appointmentDtoMapper.toDTO(saved);
     }
 
@@ -81,6 +84,8 @@ public class AppointmentService {
 
         Appointment canceledAppointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new NotFoundException("No appointment found."));
+
+        ServiceModel service = canceledAppointment.getService();
 
         if (!canceledAppointment.getUser().getId().equals(userId)){
             throw new UnauthorizedException("You can't cancel someone else's appointment.");
@@ -101,6 +106,10 @@ public class AppointmentService {
         canceledAppointment.setUpdatedAt(LocalDateTime.now());
 
         appointmentRepository.save(canceledAppointment);
+
+        service.setTimesBooked(-1);
+        serviceRepository.save(service);
+
         return appointmentDtoMapper.toDTO(canceledAppointment);
     }
 

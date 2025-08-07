@@ -19,7 +19,5 @@ public class UserAdminAnalyticsDTO {
     private final int totalAppointmentsAllTime;
     private final List<UserSummaryResponseDTO> uniqueClientsThisMonth;
     private final PopularServiceDTO mostPopularService;
-    private final BigDecimal totalRevenueThisMonth;
-    private final BigDecimal totalRevenueAllTime;
     private final int totalLoyaltyMembers;
 }

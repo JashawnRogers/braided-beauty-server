@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.mappers.service;
 
+import com.braided_beauty.braided_beauty.dtos.service.PopularServiceDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServicePatchDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
@@ -42,5 +43,12 @@ public class ServiceDtoMapper {
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
         if (dto.getPhotoUrl() != null) service.setPhotoUrl(dto.getPhotoUrl());
         if (dto.getVideoUrl() != null) service.setVideoUrl(dto.getVideoUrl());
+    }
+
+    public PopularServiceDTO toDto(ServiceModel service){
+        return PopularServiceDTO.builder()
+                .serviceName(service.getName())
+                .completedCount(service.getTimesBooked())
+                .build();
     }
 }
