@@ -27,7 +27,7 @@ public class JwtService {
         var claims = JwtClaimsSet.builder()
                 .issuer("braided-beauty")
                 .issuedAt(now)
-                .expiresAt(now.plusSeconds(30 * 60))
+                .expiresAt(now.plusSeconds(15 * 60))
                 .subject(authentication.getName())
                 .claim("scope", scope)
                 .build();
