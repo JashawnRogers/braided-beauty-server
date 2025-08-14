@@ -13,4 +13,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findAllByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
     List<User> findAllByUserType(UserType userType);
     Optional<User> findUserByEmail(String email);
+    boolean existsByEmail(String email);
 }

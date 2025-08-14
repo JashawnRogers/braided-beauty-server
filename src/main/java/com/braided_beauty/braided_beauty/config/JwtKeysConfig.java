@@ -35,6 +35,13 @@ public class JwtKeysConfig {
         }
     }
 
+    @Bean
+    public RSAPublicKey rsaPublicKey() throws IOException {
+        try (var in = publicKeyResources.getInputStream()) {
+            return RsaKeyConverters.x509().convert(in);
+        }
+    }
+
     // Create the JwtEncoder (used to SIGN tokens with the PRIVATE key)
     @Bean
     public JwtEncoder jwtEncoder(RSAPrivateKey privateKey, RSAPublicKey publicKey){

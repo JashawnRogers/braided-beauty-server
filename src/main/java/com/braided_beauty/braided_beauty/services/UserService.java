@@ -23,8 +23,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 
 @Service
@@ -103,5 +102,22 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("User not found."));
         user.setUserType(userType);
         return userAdminMapper.toSummaryDTO(user);
+    }
+
+    // Creates account in local db for first time OAuth login
+    public User registerFromOauth(Map<String, Object> attributes){
+        String email = (String) attributes.get("email");
+        String name = (String) attributes.getOrDefault("name", email);
+        String providerId = (String) attributes.getOrDefault("sub", null);
+
+        User newUser = User.builder()
+                .email(email)
+                .name(name)
+                .oAuthSubject("GOOGLE")
+                .oAuthProvider(providerId)
+                .userType(UserType.MEMBER)
+                .build();
+
+        return userRepository.save(newUser);
     }
 }

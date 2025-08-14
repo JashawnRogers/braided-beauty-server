@@ -52,6 +52,9 @@ public class User {
     @Column(name = "stripe_customer_id")
     private String stripeCustomerId;
 
+    @Column(name = "enabled")
+    private boolean isEnabled = true;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
