@@ -53,6 +53,7 @@ public class User {
     private String stripeCustomerId;
 
     @Column(name = "enabled")
+    @Builder.Default
     private boolean isEnabled = true;
 
     @PrePersist
