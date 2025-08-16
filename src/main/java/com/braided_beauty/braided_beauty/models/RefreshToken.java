@@ -21,9 +21,12 @@ import java.util.UUID;
                 @Index(name = "ix_refresh_token_expires_at", columnList = "expires_at")
         }
 )
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
+@AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Builder
 public class RefreshToken {
 
     @Id
@@ -38,7 +41,7 @@ public class RefreshToken {
     private User user;
 
     @NotNull
-    @Column(name = "token_hash", nullable = false, length = 64) // SHA-256 HEX
+    @Column(name = "token_hash", nullable = false, unique = true, length = 43) // SHA-256 Base64Url
     private String tokenHash;
 
     @NotNull

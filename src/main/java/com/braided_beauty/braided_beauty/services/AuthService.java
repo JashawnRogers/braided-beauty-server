@@ -70,7 +70,7 @@ public class AuthService {
                 .orElseGet(() -> userService.registerFromOauth(attributes));
 
         // Build authorities and principal
-        Set<String> roleStrings = roleStringsFor(user.getUserType());
+        Set<String> roleStrings = UserType.roleStringsFor(user.getUserType());
         var authorities = roleStrings.stream()
                 .map(SimpleGrantedAuthority::new)
                 .map(GrantedAuthority.class::cast)
@@ -102,15 +102,5 @@ public class AuthService {
         }
 
         return Map.of("email", oauthAuth.getName());
-    }
-
-
-    // Map enum to Spring Security role strings
-    private Set<String> roleStringsFor(UserType type){
-        return switch (type) {
-            case ADMIN -> Set.of("ROLE_ADMIN");
-            case MEMBER -> Set.of("ROLE_MEMBER");
-            case GUEST -> Set.of("ROLE_GUEST");
-        };
     }
 }
