@@ -120,4 +120,9 @@ public class UserService {
 
         return userRepository.save(newUser);
     }
+
+    public UUID findUserIdByEmail(String email) {
+        return userRepository.findUserIdByEmail(email)
+                .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
+    }
 }

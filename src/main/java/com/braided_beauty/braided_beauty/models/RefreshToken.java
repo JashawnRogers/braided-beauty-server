@@ -58,7 +58,7 @@ public class RefreshToken {
     @Column(name = "family_id", nullable = false)
     private UUID familyId;
 
-    @Column(name = "replaced_by_token_hash", length = 64) // SHA-256 HEX
+    @Column(name = "replaced_by_token_hash", length = 43)
     private String replacedByTokenHash;
 
     @Column(name = "device_info", length = 256)
