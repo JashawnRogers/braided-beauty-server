@@ -23,27 +23,28 @@ public class AppointmentController {
 
     @PostMapping("/book")
     public ResponseEntity<AppointmentResponseDTO> createAppointment(@Valid @RequestBody AppointmentRequestDTO dto) throws StripeException {
-        AppointmentResponseDTO response = appointmentService.createAppointment(dto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(appointmentService.createAppointment(dto));
+    }
+
+    @PostMapping
+    public ResponseEntity<AppointmentResponseDTO> completeAppointment(UUID appointmentId) throws StripeException {
+        return ResponseEntity.ok(appointmentService.completeAppointment(appointmentId));
     }
 
     @PatchMapping("/cancel")
     public ResponseEntity<AppointmentResponseDTO> cancelAppointment(@Valid @RequestBody CancelAppointmentDTO dto) throws StripeException{
-        AppointmentResponseDTO appointment = appointmentService.cancelAppointment(dto);
-        return ResponseEntity.ok(appointment);
+        return ResponseEntity.ok(appointmentService.cancelAppointment(dto));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AppointmentResponseDTO> getAppointmentById(@PathVariable UUID id) {
-        AppointmentResponseDTO appointment = appointmentService.getAppointmentById(id);
-        return ResponseEntity.ok(appointment);
+        return ResponseEntity.ok(appointmentService.getAppointmentById(id));
     }
 
     @GetMapping
     public ResponseEntity<List<AppointmentResponseDTO>> getAllAppointmentsByDate(@RequestParam("date")
                                                                                      @org.springframework.format.annotation.DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
                                                                                      LocalDate date){
-        List<AppointmentResponseDTO> appointments = appointmentService.getAllAppointmentsByDate(date);
-        return ResponseEntity.ok(appointments);
+        return ResponseEntity.ok(appointmentService.getAllAppointmentsByDate(date));
     }
 }
