@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,18 +20,21 @@ import java.util.UUID;
 public class ServiceController {
     private final ServicesService service;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ServiceResponseDTO> createService(@Valid @RequestBody ServiceRequestDTO serviceRequestDTO){
         ServiceResponseDTO newService = service.createService(serviceRequestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(newService);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{serviceId}")
     public ResponseEntity<String> deleteService(@PathVariable UUID serviceId){
         service.deleteServiceById(serviceId);
         return ResponseEntity.ok("Deleted service with ID: " + serviceId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{serviceId}")
     public ResponseEntity<ServiceResponseDTO> updateService(@PathVariable UUID serviceId,@Valid @RequestBody ServicePatchDTO servicePatchDTO){
        ServiceResponseDTO updatedService = service.updateService(serviceId, servicePatchDTO);
