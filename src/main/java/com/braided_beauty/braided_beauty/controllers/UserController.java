@@ -8,6 +8,12 @@ import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileRespo
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,40 +31,108 @@ import java.util.UUID;
 public class UserController {
     private final UserService userService;
 
+    @Operation(
+            summary = "Get member profile",
+            description = "Returns the profile information of the currently logged-in user or a user by ID (if ADMIN)."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = UserMemberProfileResponseDTO.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden - not the user's profile and not an admin")
+    })
     @PreAuthorize("#userId == principal.id or hasRole('ADMIN')") // Allows for admin to access all member profiles
     @GetMapping("/profile/{userId}")
-    public ResponseEntity<UserMemberProfileResponseDTO> getMemberProfile(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                                         @PathVariable UUID userId) {
+    public ResponseEntity<UserMemberProfileResponseDTO> getMemberProfile(
+            @Parameter(hidden = true) @AuthenticationPrincipal AppUserPrincipal principal,
+            @Parameter(description = "UUID of the user", required = true) @PathVariable UUID userId) {
         return ResponseEntity.ok(userService.getMemberProfile(userId));
     }
 
+    @Operation(
+            summary = "Get appointment history",
+            description = "Returns a list of all past appointments for the currently logged-in user."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Appointments retrieved",
+                    content = @Content(schema = @Schema(implementation = AppointmentResponseDTO.class)))
+    })
     @GetMapping("/appointments")
-    public ResponseEntity<List<AppointmentResponseDTO>> getAppointmentHistory(@AuthenticationPrincipal AppUserPrincipal principal) {
+    public ResponseEntity<List<AppointmentResponseDTO>> getAppointmentHistory(
+            @Parameter(hidden = true) @AuthenticationPrincipal AppUserPrincipal principal) {
         return ResponseEntity.ok(userService.getAppointmentHistory(principal
                 .getId()));
     }
 
+    @Operation(
+            summary = "Get loyalty points",
+            description = "Retrieves loyalty point records for the logged-in user."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Loyalty points retrieved",
+                    content = @Content(schema = @Schema(implementation = LoyaltyRecordResponseDTO.class)))
+    })
     @GetMapping("/loyalty-points")
-    public ResponseEntity<LoyaltyRecordResponseDTO> getLoyaltyPoints(@AuthenticationPrincipal AppUserPrincipal principal) {
+    public ResponseEntity<LoyaltyRecordResponseDTO> getLoyaltyPoints(
+            @Parameter(hidden = true) @AuthenticationPrincipal AppUserPrincipal principal) {
         return ResponseEntity.ok(userService.getLoyaltyPoints(principal
                 .getId()));
     }
 
+    @Operation(
+            summary = "Get all users (ADMIN only)",
+            description = "Returns a list of all users in the system. Only accessible by admins."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Users retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = UserSummaryResponseDTO.class)))
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/all-users")
     public ResponseEntity<List<UserSummaryResponseDTO>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
+
+    @Operation(
+            summary = "Get monthly analytics (ADMIN only)",
+            description = "Returns analytics data for the given month. Only accessible by admins.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Month and year to retrieve analytics for (format: YYYY-MM)",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = YearMonth.class))
+            )
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Analytics retrieved",
+                    content = @Content(schema = @Schema(implementation = UserAdminAnalyticsDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request body")
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics")
     public ResponseEntity<UserAdminAnalyticsDTO> getAnalytics(@RequestBody YearMonth yearMonth) {
         return ResponseEntity.ok(userService.getAnalytics(yearMonth));
     }
 
+    @Operation(
+            summary = "Update user role (ADMIN only)",
+            description = "Updates the role (e.g., MEMBER, ADMIN) for a specific user.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "New user role",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = UserType.class))
+            )
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Role updated successfully",
+                    content = @Content(schema = @Schema(implementation = UserSummaryResponseDTO.class))),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/{userId}")
-    public ResponseEntity<UserSummaryResponseDTO> updateUserRole(@PathVariable UUID userId, @RequestBody UserType userType) {
+    public ResponseEntity<UserSummaryResponseDTO> updateUserRole(
+            @Parameter(description = "UUID of the user", required = true)
+            @PathVariable UUID userId,
+            @RequestBody UserType userType) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.updateUserRole(userId, userType));
     }
 }
