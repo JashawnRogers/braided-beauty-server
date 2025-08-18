@@ -10,7 +10,6 @@ import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -73,14 +72,13 @@ public class AuthService {
         Set<String> roleStrings = UserType.roleStringsFor(user.getUserType());
         var authorities = roleStrings.stream()
                 .map(SimpleGrantedAuthority::new)
-                .map(GrantedAuthority.class::cast)
                 .toList();
 
         var principal = new AppUserPrincipal(
                 user.getId(),
                 user.getEmail(),
                 user.getName() != null ? user.getName() : name,
-                roleStrings
+                authorities
         );
 
         // Return authenticated token

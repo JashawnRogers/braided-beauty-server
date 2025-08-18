@@ -63,7 +63,7 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
 
-        UUID userId = ((AppUserPrincipal) auth.getPrincipal()).id();
+        UUID userId = ((AppUserPrincipal) auth.getPrincipal()).getId();
 
         String token = jwtService.generateAccessToken(auth);
         var issued = refreshTokenService.issueForUser(userId, "web");

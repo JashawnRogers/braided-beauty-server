@@ -166,7 +166,7 @@ public class RefreshTokenService {
                 user.getId(),
                 user.getEmail(),
                 user.getName() != null ? user.getName() : null,
-                roleStrings
+                authorities
         );
 
         return new UsernamePasswordAuthenticationToken(principal, null, authorities);

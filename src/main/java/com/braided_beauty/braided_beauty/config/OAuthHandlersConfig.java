@@ -23,7 +23,7 @@ public class OAuthHandlersConfig {
             String accessToken = jwtService.generateAccessToken(appAuth);
 
             var principal = (AppUserPrincipal) appAuth.getPrincipal();
-            var issued = refreshTokenService.issueForUser(principal.id(), "web");
+            var issued = refreshTokenService.issueForUser(principal.getId(), "web");
 
             var cookie = ResponseCookie.from("refreshToken", issued.getRefreshToken())
                     .httpOnly(true).secure(true).sameSite("None").path("/")
