@@ -10,6 +10,13 @@ import com.stripe.model.Event;
 import com.stripe.exception.SignatureVerificationException;
 
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,9 +47,22 @@ public class StripeWebhookController {
 
     );
 
+    @Operation(
+            summary = "Stripe Webhook Endpoint",
+            description = "Handles incoming webhook events from Stripe such as checkout completion and payment failures.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = String.class))
+            )
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Event received and processed"),
+            @ApiResponse(responseCode = "400", description = "Invalid signature or failed deserialization")
+    })
     @PostMapping
     public ResponseEntity<String> handleWebhook(@RequestBody String payload,
-                                                @RequestHeader("Stripe-Signature") String sigHeader) {
+                                                @Parameter(name = "Stripe-Signature", in = ParameterIn.HEADER, required = true, description = "Stripe signature header")
+                                                @RequestHeader String sigHeader) {
         Event event;
 
         try{
