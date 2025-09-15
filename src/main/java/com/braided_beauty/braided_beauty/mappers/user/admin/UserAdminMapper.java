@@ -52,13 +52,21 @@ public class UserAdminMapper {
     }
 
     public UserSummaryResponseDTO toSummaryDTO(User user){
+        Integer points = 0;
+        Integer redeemed = 0;
+
+        LoyaltyRecord lr = user.getLoyaltyRecord();
+        if (lr != null) {
+            points = lr.getPoints() != null ? lr.getPoints() : 0;
+            redeemed = lr.getRedeemedPoints() != null ? lr.getRedeemedPoints() : 0;
+        }
         return UserSummaryResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .userType(user.getUserType())
                 .createdAt(user.getCreatedAt())
-                .loyaltyPoints(user.getLoyaltyRecord().getPoints())
+                .loyaltyPoints(points)
                 .build();
     }
 }

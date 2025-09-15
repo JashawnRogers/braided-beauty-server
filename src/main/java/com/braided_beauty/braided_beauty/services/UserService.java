@@ -18,6 +18,9 @@ import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -61,12 +64,35 @@ public class UserService {
         return loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord());
     }
 
-    public List<UserSummaryResponseDTO> getAllUsers(){
-        List<User> users = userRepository.findAll();
+    public Page<UserSummaryResponseDTO> getAllUsers(
+            String search,
+            LocalDateTime createdAtFrom,
+            LocalDateTime createdAtTo,
+            UserType userType,
+            Pageable pageable
+    ) {
+        Specification<User> spec = (root, q, cb) -> cb.conjunction();
 
-        return users.stream()
-                .map(userAdminMapper::toSummaryDTO)
-                .toList();
+        if (search != null && !search.isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("name")), "%" + search.toLowerCase() + "%"),
+                    cb.like(cb.lower(root.get("email")), "%" + search.toLowerCase() + "%")
+            ));
+        }
+
+        if (createdAtFrom != null) {
+            spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), createdAtFrom));
+        }
+        if (createdAtTo != null) {
+            spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("createdAt"), createdAtTo));
+        }
+
+        if (userType != null) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("userType"), userType));
+        }
+
+        return userRepository.findAll(spec, pageable)
+                .map(userAdminMapper::toSummaryDTO);
     }
 
     public UserAdminAnalyticsDTO getAnalytics(YearMonth yearMonth){

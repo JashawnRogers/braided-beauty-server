@@ -8,7 +8,7 @@ public class CorsConfig {
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-        corsConfig.setAllowedOrigins(java.util.List.of("https://localhost:3000"));
+        corsConfig.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
         corsConfig.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         corsConfig.setAllowedHeaders(java.util.List.of("*"));
         corsConfig.setAllowCredentials(true); // <-- required for cookies

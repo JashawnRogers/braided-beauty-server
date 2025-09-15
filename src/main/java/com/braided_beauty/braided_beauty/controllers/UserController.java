@@ -10,17 +10,24 @@ import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
@@ -79,17 +86,90 @@ public class UserController {
     }
 
     @Operation(
-            summary = "Get all users (ADMIN only)",
-            description = "Returns a list of all users in the system. Only accessible by admins."
+            summary = "Get users (paged, ADMIN only)",
+            description = """
+        Returns a paginated list of users. Supports full-text search (name/email),
+        creation date range, user type filtering, and sorting.
+        Only accessible by admins.
+        """
     )
+    @Parameters({
+            @Parameter(
+                    name = "search",
+                    in = ParameterIn.QUERY,
+                    description = "Full-text search (matches name or email, case-insensitive).",
+                    example = "john"
+            ),
+            @Parameter(
+                    name = "createdAtFrom",
+                    in = ParameterIn.QUERY,
+                    description = "Filter users created at/after this instant (ISO 8601).",
+                    example = "2025-01-01T00:00:00Z",
+                    schema = @Schema(type = "string", format = "date-time")
+            ),
+            @Parameter(
+                    name = "createdAtTo",
+                    in = ParameterIn.QUERY,
+                    description = "Filter users created at/before this instant (ISO 8601).",
+                    example = "2025-12-31T23:59:59Z",
+                    schema = @Schema(type = "string", format = "date-time")
+            ),
+            @Parameter(
+                    name = "userType",
+                    in = ParameterIn.QUERY,
+                    description = "User type/role filter.",
+                    example = "ADMIN",
+                    schema = @Schema(implementation = UserType.class)
+            ),
+            // Pageable params (expanded by springdoc using @ParameterObject)
+            @Parameter(
+                    name = "page",
+                    in = ParameterIn.QUERY,
+                    description = "Zero-based page index (defaults to 0).",
+                    example = "0"
+            ),
+            @Parameter(
+                    name = "size",
+                    in = ParameterIn.QUERY,
+                    description = "Page size (defaults to 25).",
+                    example = "25"
+            ),
+            @Parameter(
+                    name = "sort",
+                    in = ParameterIn.QUERY,
+                    description = "Sorting criteria in the format `property,ASC|DESC`. Repeat to sort by multiple fields.",
+                    example = "createdAt,DESC"
+            )
+    })
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Users retrieved successfully",
-                    content = @Content(schema = @Schema(implementation = UserSummaryResponseDTO.class)))
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Users retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = UserSummaryResponseDTO.class))
+                    )
+            ),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden (admin only)"),
+            @ApiResponse(responseCode = "500", description = "Server error")
     })
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/all-users")
-    public ResponseEntity<List<UserSummaryResponseDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    public ResponseEntity<Page<UserSummaryResponseDTO>> getAllUsers(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtTo,
+            @RequestParam(required = false) UserType userType,
+            Pageable pageable
+    ) {
+        try {
+            Page<UserSummaryResponseDTO> page = userService.getAllUsers(search, createdAtFrom, createdAtTo, userType, pageable);
+            return ResponseEntity.ok(page);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
 
