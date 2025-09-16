@@ -46,7 +46,7 @@ public class User {
     @OneToMany(mappedBy = "user")
     private List<Appointment> appointments;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private LoyaltyRecord loyaltyRecord;
 
     @Column(name = "stripe_customer_id")

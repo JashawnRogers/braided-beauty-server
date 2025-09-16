@@ -21,7 +21,8 @@ public class LoyaltyRecord {
     private UUID id;
 
     @OneToOne
-    @JoinColumn(name = "user_id", unique = true)
+    @MapsId
+    @JoinColumn(name = "user_id", nullable = false ,unique = true)
     private User user;
 
     private Integer points = 0;

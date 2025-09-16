@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
+import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
@@ -41,6 +42,10 @@ public class AuthService {
         newUser.setPhoneNumber(dto.getPhoneNumber() != null ? dto.getPhoneNumber() : null);
         newUser.setUserType(UserType.MEMBER);
         newUser.setPassword(passwordEncoder.encode(dto.getPassword()));
+
+        LoyaltyRecord loyaltyRecord = new LoyaltyRecord();
+        loyaltyRecord.setUser(newUser);
+        newUser.setLoyaltyRecord(loyaltyRecord);
         userRepository.save(newUser);
     }
 

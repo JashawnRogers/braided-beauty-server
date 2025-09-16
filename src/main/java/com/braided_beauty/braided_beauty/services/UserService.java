@@ -12,6 +12,7 @@ import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.mappers.user.admin.UserAdminMapper;
 import com.braided_beauty.braided_beauty.mappers.user.member.UserMemberDtoMapper;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
@@ -136,12 +137,15 @@ public class UserService {
         String name = (String) attributes.getOrDefault("name", email);
         String providerId = (String) attributes.getOrDefault("sub", null);
 
+        LoyaltyRecord loyaltyRecord = new LoyaltyRecord();
+
         User newUser = User.builder()
                 .email(email)
                 .name(name)
                 .oAuthSubject("GOOGLE")
                 .oAuthProvider(providerId)
                 .userType(UserType.MEMBER)
+                .loyaltyRecord(loyaltyRecord)
                 .build();
 
         return userRepository.save(newUser);
