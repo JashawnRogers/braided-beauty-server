@@ -21,10 +21,14 @@ public class UserMemberDtoMapper {
     private final ServiceDtoMapper serviceDtoMapper;
     private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
 
-    public User toEntity(UserMemberRequestDTO dto){
+    public static User toEntity(UserMemberRequestDTO dto){
         return User.builder()
+                .id(dto.getId())
                 .name(dto.getName())
+                .email(dto.getEmail())
                 .phoneNumber(dto.getPhoneNumber())
+                .userType(dto.getUserType())
+                .loyaltyRecord(dto.getLoyaltyRecord())
                 .build();
     }
 

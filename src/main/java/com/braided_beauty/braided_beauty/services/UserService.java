@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.*;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
@@ -154,5 +155,15 @@ public class UserService {
     public UUID findUserIdByEmail(String email) {
         return userRepository.findUserIdByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
+    }
+
+    public UserMemberProfileResponseDTO updateMemberData(UserMemberRequestDTO dto) {
+        userRepository.findById(dto.getId())
+                .orElseThrow(() -> new NotFoundException("User does not exist"));
+
+        User user =  UserMemberDtoMapper.toEntity(dto);
+        userRepository.save(user);
+
+        return userMemberDtoMapper.toDTO(user);
     }
 }

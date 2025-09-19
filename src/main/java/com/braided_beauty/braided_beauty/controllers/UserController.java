@@ -5,6 +5,7 @@ import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordRespons
 import com.braided_beauty.braided_beauty.dtos.user.admin.UserAdminAnalyticsDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.UserSummaryResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;
@@ -223,5 +224,11 @@ public class UserController {
             @PathVariable UUID userId,
             @RequestBody UserType userType) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.updateUserRole(userId, userType));
+    }
+
+    //@PreAuthorize("#userId == principal.id or hasRole('ADMIN')")
+    @PutMapping("/{userId}")
+    public ResponseEntity<UserMemberProfileResponseDTO> updateMemberData(@PathVariable UUID userId, @RequestBody UserMemberRequestDTO dto) {
+        return ResponseEntity.status(HttpStatus.OK).body(userService.updateMemberData(dto));
     }
 }
