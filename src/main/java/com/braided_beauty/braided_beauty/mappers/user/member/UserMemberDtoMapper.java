@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.braided_beauty.braided_beauty.utils.PhoneNormalizer.toE164;
+
 @Component
 @AllArgsConstructor
 public class UserMemberDtoMapper {
@@ -26,7 +28,7 @@ public class UserMemberDtoMapper {
                 .id(dto.getId())
                 .name(dto.getName())
                 .email(dto.getEmail())
-                .phoneNumber(dto.getPhoneNumber())
+                .phoneNumber(toE164(dto.getPhoneNumber()))
                 .userType(dto.getUserType())
                 .loyaltyRecord(dto.getLoyaltyRecord())
                 .build();
