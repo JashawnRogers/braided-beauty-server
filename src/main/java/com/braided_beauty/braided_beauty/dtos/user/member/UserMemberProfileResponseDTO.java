@@ -25,5 +25,5 @@ public class UserMemberProfileResponseDTO {
     private final String email;
     private final String phoneNumber;
     private final List<AppointmentResponseDTO> appointments;
-    private final LoyaltyRecordResponseDTO loyalty;
+    private final LoyaltyRecordResponseDTO loyaltyRecord;
 }

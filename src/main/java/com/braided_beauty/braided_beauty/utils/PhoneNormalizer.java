@@ -1,32 +1,24 @@
 package com.braided_beauty.braided_beauty.utils;
 
-import jakarta.annotation.Nullable;
 import lombok.NoArgsConstructor;
 
+import java.util.Optional;
+
 @NoArgsConstructor
-public class PhoneNormalizer {
-// Normalize to E.164 (+1XXXXXXXXXX) for US-only; returns null if blank/invalid
-    @Nullable
-    public static String toE164(@Nullable String raw) {
-        if (raw == null) return null;
+public final class PhoneNormalizer {
+    /**
+     *   Normalize to E.164 for US numbers; empty/blank -> empty Optional.
+     *   Handles the empty string sometimes returned from React Admin.
+     * */
+    public static Optional<String> toE164(String input) {
+        if (input == null) return Optional.empty();
+        String digits = input.replaceAll("\\D+", "");
+        if (digits.isBlank()) return Optional.empty();
 
-        // Trim & normalize whitespace
-        String s = raw.trim();
-        if (s.isEmpty()) return null;
+        // Accept 10 digits (assume US) or 11 starting with '1'
+        if (digits.length() == 10) return Optional.of("+1" + digits);
+        if (digits.length() == 11 && digits.startsWith("1")) return Optional.of("+" + digits);
 
-        // Keep leading '+' if present, strip everything else non-digit
-        boolean hasPlus = s.startsWith("+");
-        String digits = s.replaceAll("\\D", "");
-
-        // If user typed 10 US digits, assume +1
-        if (digits.length() == 10) return "+1" + digits;
-
-        // If they typed +1XXXXXXXXXX (11 digits) or 1XXXXXXXXXX and we had '+'
-        if (hasPlus && digits.length() == 11 && digits.startsWith("1")) {
-            return "+" + digits;
-        }
-
-        // Otherwise reject as invalid
-        return null;
+        throw new IllegalArgumentException("Invalid phone number");
     }
 }

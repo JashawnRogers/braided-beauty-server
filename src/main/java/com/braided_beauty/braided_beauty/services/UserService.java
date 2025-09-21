@@ -24,6 +24,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -157,13 +158,12 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
     }
 
+    @Transactional // <-- Allows JPA to push pending changes to DB
     public UserMemberProfileResponseDTO updateMemberData(UserMemberRequestDTO dto) {
-        userRepository.findById(dto.getId())
+        User user = userRepository.findById(dto.getId())
                 .orElseThrow(() -> new NotFoundException("User does not exist"));
-
-        User user =  UserMemberDtoMapper.toEntity(dto);
-        userRepository.save(user);
-
+        userRepository.save(UserMemberDtoMapper.toEntity(user, dto));
+        // Saving is not needed due to JPA managing the entity at transaction commit
         return userMemberDtoMapper.toDTO(user);
     }
 }

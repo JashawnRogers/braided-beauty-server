@@ -1,0 +1,5 @@
+--INSERT INTO loyalty_records (id, user_id, points, redeemed_points, updated_at)
+--SELECT u.id, u.id, 0, 0, NOW()
+--FROM users u
+--LEFT JOIN loyalty_records lr ON lr.user_id = u.id
+--WHERE lr.user_id IS NULL;
