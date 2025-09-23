@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +24,10 @@ public class UserMemberProfileResponseDTO {
     private final String name;
     @NotNull
     private final String email;
+    @NotNull
+    private final LocalDateTime updatedAt;
+    @NotNull
+    private final LocalDateTime createdAt;
     private final String phoneNumber;
     private final UserType userType;
     private final List<AppointmentResponseDTO> appointments;

@@ -57,6 +57,8 @@ public class UserMemberDtoMapper {
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .userType(user.getUserType())
+                .updatedAt(user.getUpdatedAt())
+                .createdAt(user.getCreatedAt())
                 .appointments(user.getAppointments()
                         .stream()
                         .map(appointmentDtoMapper::toDTO)
