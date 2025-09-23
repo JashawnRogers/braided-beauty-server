@@ -24,6 +24,7 @@ public class UserMemberProfileResponseDTO {
     @NotNull
     private final String email;
     private final String phoneNumber;
+    private final UserType userType;
     private final List<AppointmentResponseDTO> appointments;
     private final LoyaltyRecordResponseDTO loyaltyRecord;
 }
