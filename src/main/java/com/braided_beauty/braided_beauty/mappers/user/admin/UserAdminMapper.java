@@ -52,14 +52,13 @@ public class UserAdminMapper {
     }
 
     public UserSummaryResponseDTO toSummaryDTO(User user){
-        Integer points = 0;
-        Integer redeemed = 0;
-
         LoyaltyRecord lr = user.getLoyaltyRecord();
-        if (lr != null) {
-            points = lr.getPoints() != null ? lr.getPoints() : 0;
-            redeemed = lr.getRedeemedPoints() != null ? lr.getRedeemedPoints() : 0;
-        }
+
+        LoyaltyRecordResponseDTO loyaltyDTO = LoyaltyRecordResponseDTO.builder()
+                .points(lr.getPoints() != null ? lr.getPoints() : 0)
+                .redeemedPoints(lr.getRedeemedPoints() != null ? lr.getRedeemedPoints() : 0)
+                .build();
+
         return UserSummaryResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -67,7 +66,7 @@ public class UserAdminMapper {
                 .phoneNumber(user.getPhoneNumber())
                 .userType(user.getUserType())
                 .createdAt(user.getCreatedAt())
-                .loyaltyRecord(lr)
+                .loyaltyRecord(loyaltyDTO)
                 .build();
     }
 }
