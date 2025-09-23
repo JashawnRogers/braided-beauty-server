@@ -64,9 +64,10 @@ public class UserAdminMapper {
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
                 .userType(user.getUserType())
                 .createdAt(user.getCreatedAt())
-                .loyaltyPoints(points)
+                .loyaltyRecord(lr)
                 .build();
     }
 }

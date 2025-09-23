@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.dtos.user.admin;
 
 import com.braided_beauty.braided_beauty.enums.UserType;
+import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,6 @@ public class UserSummaryResponseDTO {
     private final UserType userType;
     @NotNull
     private final LocalDateTime createdAt;
-    private final Integer loyaltyPoints;
-
+    private final LoyaltyRecord loyaltyRecord;
+    private final String phoneNumber;
 }
