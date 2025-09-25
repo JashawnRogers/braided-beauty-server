@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,"/api/v1/**").permitAll()
                         // For testing purposes only
                         .requestMatchers(HttpMethod.PUT,"/api/v1/**").permitAll()
+                        // For testing purposes only
+                        .requestMatchers(HttpMethod.POST,"/api/v1/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/appointments/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/stripe/webhook").permitAll()
                         .anyRequest().authenticated()

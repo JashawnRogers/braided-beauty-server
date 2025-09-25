@@ -2,11 +2,13 @@ package com.braided_beauty.braided_beauty.models;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,7 +74,8 @@ public class Appointment {
             joinColumns = @JoinColumn(name = "appointment_id"), // Name of join table column and foreign key to appointment entity
             inverseJoinColumns = @JoinColumn(name = "add_on_id") //Name of join table column and foreign key to add on entity
     )
-    private List<AddOn> addOns;
+    @Builder.Default
+    private List<AddOn> addOns = new ArrayList<>();
 
     @PrePersist
     protected void onCreate(){
