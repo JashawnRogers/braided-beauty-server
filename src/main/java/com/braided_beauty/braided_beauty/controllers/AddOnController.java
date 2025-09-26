@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +35,11 @@ public class AddOnController {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AddOnResponseDTO> getAddOn(@PathVariable UUID id) {
+        return ResponseEntity.ok(addOnService.getAddOn(id));
     }
 
     @PostMapping

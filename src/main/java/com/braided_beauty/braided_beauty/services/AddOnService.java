@@ -29,6 +29,11 @@ public class AddOnService {
     private final AddOnRepository addOnRepository;
     private final AddOnDTOMapper addOnDTOMapper;
 
+    public AddOnResponseDTO getAddOn(UUID id) {
+        return addOnRepository.findById(id).map(addOnDTOMapper::toDto).orElseThrow(() ->
+                new NotFoundException("No add on found with that ID: " + id));
+    }
+
     public List<AddOn> getAddOnIds(List<UUID> ids) {
         return addOnRepository.findAllById(ids);
 
