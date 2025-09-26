@@ -15,8 +15,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -41,10 +43,21 @@ public class AddOnService {
         Specification<AddOn> spec = (root, q, cb) -> cb.conjunction();
 
         if (search != null && !search.isBlank()) {
-            spec = spec.and((root, q, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("name")), "%" + search.toLowerCase() + "%"),
-                    cb.like(cb.lower(root.get("price")), "%" + search.toLowerCase() + "%")
-            ));
+            Specification<AddOn> byName =
+                    (root, q, cb) ->
+                            cb.like(cb.lower(root.get("name")), "%" + search.trim().toLowerCase(Locale.ROOT) + "%");
+
+            Specification<AddOn> byPrice = null;
+            try {
+                BigDecimal price = new BigDecimal(search.trim());
+                byPrice = (root, q, cb) ->
+                        cb.equal(root.get("price"), price);
+            } catch (NumberFormatException ignored) {
+                // not numeric -> skip price criterion
+            }
+
+            // Combine: (name LIKE ...) OR (price = ...)
+            spec = spec.and(byPrice != null ? byName.or(byPrice) : byName);
         }
 
         if (createdAtFrom != null) {
