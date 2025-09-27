@@ -117,6 +117,9 @@ public class UserService {
 
         int loyaltyMembers = userRepository.findAllByUserType(UserType.MEMBER).size();
 
+        // New clients?
+        // Returning clients?
+
         return UserAdminAnalyticsDTO.builder()
                 .totalAppointmentsByMonth(appointmentsByMonth)
                 .totalAppointmentsAllTime(totalAppointmentsAllTime)

@@ -20,4 +20,5 @@ public class AddOnRequestDTO {
     private String name;
     @PositiveOrZero(message = "price must be zero or more.")
     private BigDecimal price;
+    private String description;
 }

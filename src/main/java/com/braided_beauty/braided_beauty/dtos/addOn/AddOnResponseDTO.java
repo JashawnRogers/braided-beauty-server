@@ -19,4 +19,5 @@ public class AddOnResponseDTO {
     private final String name;
     private final BigDecimal price;
     private final List<Appointment> appointments;
+    private final String description;
 }

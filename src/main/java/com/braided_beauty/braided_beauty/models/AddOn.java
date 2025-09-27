@@ -27,8 +27,11 @@ public class AddOn {
     private String name;
     @Column(name = "price")
     private BigDecimal price;
+    @Column(name = "add_on")
     @JsonIgnore // Prevents circular dependencies when serializing the object for exporting to other platforms
     @ManyToMany(mappedBy = "addOns")
     @Builder.Default
     private List<Appointment> appointments = new ArrayList<>();
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
 }
