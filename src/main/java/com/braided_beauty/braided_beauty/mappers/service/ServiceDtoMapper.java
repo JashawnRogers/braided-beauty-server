@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 import java.math.RoundingMode;
 import java.util.*;
 
+import static com.braided_beauty.braided_beauty.utils.Deposit.getDepositAmount;
+
 @Component
 public class ServiceDtoMapper {
 
@@ -31,7 +33,7 @@ public class ServiceDtoMapper {
         if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName());
         if (dto.getDescription() != null) service.setDescription(dto.getDescription());
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
-        if (dto.getDepositAmount() != null) service.setDepositAmount(dto.getDepositAmount());
+        if (dto.getPrice() != null) service.setDepositAmount(getDepositAmount(dto.getPrice()));
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
 
         List<String> photos = normalizeKeys(dto.getPhotoKeys());

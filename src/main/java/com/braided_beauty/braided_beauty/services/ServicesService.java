@@ -3,8 +3,6 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceCreateDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
-import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadRequestDTO;
-import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
@@ -26,16 +24,17 @@ public class ServicesService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
+    @Transactional
     public ServiceResponseDTO createService(ServiceCreateDTO dto){
         ServiceModel service = serviceDtoMapper.create(dto);
         if (serviceRepository.existsByName(service.getName())){
             throw new DuplicateEntityException("A service with this name already exists.");
         }
-        ServiceModel newService = serviceRepository.save(service);
-        log.info("Created service with ID: {}", newService.getId());
-        return serviceDtoMapper.toDto(newService);
+        log.info("Created service with ID: {}", service.getId());
+        return serviceDtoMapper.toDto(service);
     }
 
+    @Transactional
     public void deleteServiceById(UUID serviceId){
         ServiceModel serviceToDelete = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
