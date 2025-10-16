@@ -124,7 +124,7 @@ public class UserService {
                 .totalAppointmentsByMonth(appointmentsByMonth)
                 .totalAppointmentsAllTime(totalAppointmentsAllTime)
                 .uniqueClientsThisMonth(newUsersThisMonth)
-                .mostPopularService(serviceDtoMapper.toDto(mostPopularService))
+                .mostPopularService(serviceDtoMapper.toMostPopularServiceDto(mostPopularService))
                 .totalLoyaltyMembers(loyaltyMembers)
                 .build();
     }

@@ -1,13 +1,16 @@
 package com.braided_beauty.braided_beauty.services;
 
-import com.braided_beauty.braided_beauty.dtos.service.ServicePatchDTO;
+import com.braided_beauty.braided_beauty.dtos.service.ServiceCreateDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadRequestDTO;
+import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,14 +26,14 @@ public class ServicesService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
-    public ServiceResponseDTO createService(ServiceRequestDTO serviceRequestDTO){
-        ServiceModel service = serviceDtoMapper.toEntity(serviceRequestDTO);
+    public ServiceResponseDTO createService(ServiceCreateDTO dto){
+        ServiceModel service = serviceDtoMapper.create(dto);
         if (serviceRepository.existsByName(service.getName())){
             throw new DuplicateEntityException("A service with this name already exists.");
         }
         ServiceModel newService = serviceRepository.save(service);
         log.info("Created service with ID: {}", newService.getId());
-        return serviceDtoMapper.toDTO(newService);
+        return serviceDtoMapper.toDto(newService);
     }
 
     public void deleteServiceById(UUID serviceId){
@@ -40,20 +43,20 @@ public class ServicesService {
         log.info("Deleting service with ID: {} ", serviceId);
     }
 
-    public ServiceResponseDTO updateService(UUID serviceId, ServicePatchDTO servicePatchDTO){
+    @Transactional
+    public ServiceResponseDTO updateService(UUID serviceId, ServiceRequestDTO serviceRequestDTO){
         ServiceModel existingService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
-        serviceDtoMapper.updateServiceFromPatchDTO(servicePatchDTO, existingService);
-        ServiceModel updatedService = serviceRepository.save(existingService);
+        serviceDtoMapper.updateDto(serviceRequestDTO, existingService);
         log.info("Updated service with ID: {}", serviceId);
-        return serviceDtoMapper.toDTO(updatedService);
+        return serviceDtoMapper.toDto(existingService);
     }
 
     public List<ServiceResponseDTO> getAllServices(){
         List<ServiceModel> allServices = serviceRepository.findAll();
         log.info("Returning all services: {}", allServices.size());
         return allServices.stream()
-                .map(serviceDtoMapper::toDTO)
+                .map(serviceDtoMapper::toDto)
                 .toList();
     }
 
@@ -61,6 +64,6 @@ public class ServicesService {
         ServiceModel service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
         log.info("Retrieved service with ID: {}", serviceId);
-        return serviceDtoMapper.toDTO(service);
+        return serviceDtoMapper.toDto(service);
     }
 }

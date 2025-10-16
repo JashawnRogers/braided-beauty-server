@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,11 +29,13 @@ public class ServiceModel {
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
-    @Column(name = "photo_url")
-    private String photoUrl;
+    @ElementCollection
+    @CollectionTable(name ="service_key", joinColumns = @JoinColumn(name = "service_id"))
+    @Column(name = "url")
+    private List<String> photoKeys = new ArrayList<>();
 
-    @Column(name = "video_url")
-    private String videoUrl;
+    @Column(name = "video_key")
+    private String videoKey;
 
     @OneToMany(mappedBy = "service")
     private List<Appointment> appointments;

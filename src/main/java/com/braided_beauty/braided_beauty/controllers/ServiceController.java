@@ -1,6 +1,6 @@
 package com.braided_beauty.braided_beauty.controllers;
 
-import com.braided_beauty.braided_beauty.dtos.service.ServicePatchDTO;
+import com.braided_beauty.braided_beauty.dtos.service.ServiceCreateDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.services.ServicesService;
@@ -36,10 +36,10 @@ public class ServiceController {
             @ApiResponse(responseCode = "400", description = "Invalid input", content = @Content),
             @ApiResponse(responseCode = "403", description = "Access denied", content = @Content)
     })
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<ServiceResponseDTO> createService(@Valid @RequestBody ServiceRequestDTO serviceRequestDTO){
-        ServiceResponseDTO newService = service.createService(serviceRequestDTO);
+    public ResponseEntity<ServiceResponseDTO> createService(@Valid @RequestBody ServiceCreateDTO dto){
+        ServiceResponseDTO newService = service.createService(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(newService);
     }
 
@@ -76,8 +76,8 @@ public class ServiceController {
     public ResponseEntity<ServiceResponseDTO> updateService(
             @Parameter(description = "UUID of the service to update", required = true)
             @PathVariable UUID serviceId,
-            @Valid @RequestBody ServicePatchDTO servicePatchDTO){
-       ServiceResponseDTO updatedService = service.updateService(serviceId, servicePatchDTO);
+            @Valid @RequestBody ServiceRequestDTO dto){
+       ServiceResponseDTO updatedService = service.updateService(serviceId, dto);
         return ResponseEntity.ok(updatedService);
     }
 
