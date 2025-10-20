@@ -8,11 +8,11 @@ import lombok.Setter;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.UUID;
 
 @AllArgsConstructor
 @Getter
 @Setter
-@Builder
 public class BusinessHoursRequestDTO {
 
     @NotNull
@@ -20,4 +20,5 @@ public class BusinessHoursRequestDTO {
     private final LocalTime openTime;
     private final LocalTime closeTime;
     private final boolean isClosed;
+    private final UUID id;
 }

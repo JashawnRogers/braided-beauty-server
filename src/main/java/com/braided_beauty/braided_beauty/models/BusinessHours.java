@@ -8,29 +8,34 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "business_hours")
+@Table(name = "business_hours",
+    uniqueConstraints = @UniqueConstraint(
+            name = "uk_business_hours_day",
+            columnNames = "day_of_week"
+    )
+)
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
 @Builder
 public class BusinessHours {
-    // Should be a single row in DB
+    // One row per day
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "day_of_week", nullable = false)
     private DayOfWeek dayOfWeek;
 
-    @Column(nullable = true)
+    @Column(name = "open_time")
     private LocalTime openTime;
 
-    @Column(nullable = true)
+    @Column(name = "close_time")
     private LocalTime closeTime;
 
-    @Column(nullable = false)
+    @Column(name = "is_closed", nullable = false)
     private boolean isClosed;
 }
