@@ -15,8 +15,8 @@ import java.util.UUID;
 @Builder
 public class BusinessHoursResponseDTO {
    private final UUID id;
-   private final String dayOfWeek;
-   private final String openTime;
-   private final String closeTime;
-   private final String isClosed;
+   private final DayOfWeek dayOfWeek;
+   private final LocalTime openTime;
+   private final LocalTime closeTime;
+   private final boolean isClosed;
 }

@@ -5,9 +5,6 @@ import com.braided_beauty.braided_beauty.dtos.shared.BusinessHoursResponseDTO;
 import com.braided_beauty.braided_beauty.models.BusinessHours;
 import org.springframework.stereotype.Component;
 
-import java.time.DayOfWeek;
-import java.time.format.DateTimeFormatter;
-
 @Component
 public class BusinessHoursDtoMapper {
 
@@ -28,27 +25,12 @@ public class BusinessHoursDtoMapper {
     }
 
     public BusinessHoursResponseDTO toDTO(BusinessHours dto){
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("h:mm a");
-
-        String open = dto.getOpenTime() != null ? dto.getOpenTime().format(formatter) : "-";
-        String close = dto.getCloseTime() != null ? dto.getCloseTime().format(formatter) : "-";
-        String isClosed = dto.isClosed() ? "Closed" : "Open";
-        String dayOfWeek = dto.getDayOfWeek() != null ? switch (dto.getDayOfWeek()) {
-            case DayOfWeek.SUNDAY -> "Sunday";
-            case DayOfWeek.MONDAY -> "Monday";
-            case DayOfWeek.TUESDAY -> "Tuesday";
-            case DayOfWeek.WEDNESDAY -> "Wednesday";
-            case DayOfWeek.THURSDAY -> "Thursday";
-            case DayOfWeek.FRIDAY -> "Friday";
-            case DayOfWeek.SATURDAY -> "Saturday";
-        } : "-";
-
         return BusinessHoursResponseDTO.builder()
                 .id(dto.getId())
-                .dayOfWeek(dayOfWeek)
-                .openTime(open)
-                .closeTime(close)
-                .isClosed(isClosed)
+                .dayOfWeek(dto.getDayOfWeek())
+                .openTime(dto.getOpenTime())
+                .closeTime(dto.getCloseTime())
+                .isClosed(dto.isClosed())
                 .build();
     }
 }
