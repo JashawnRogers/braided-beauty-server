@@ -33,7 +33,7 @@ public class BusinessHoursController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
-    @PutMapping("/update/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<BusinessHoursResponseDTO> update(@Valid @RequestBody BusinessHoursRequestDTO dto,
                                                            @PathVariable UUID id) {
         return ResponseEntity.ok(service.update(id, dto));
