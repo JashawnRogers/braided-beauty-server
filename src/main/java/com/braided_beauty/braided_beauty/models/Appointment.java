@@ -68,6 +68,9 @@ public class Appointment {
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
+    @Column(name = "loyalty_applied", nullable = false)
+    private boolean loyaltyApplied = false;
+
     @ManyToMany
     @JoinTable(
             name = "appointment_add_ons", // Name of the join table

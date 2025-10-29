@@ -3,16 +3,17 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.mappers.payment.PaymentDtoMapper;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.RefundCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +32,10 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final AppointmentRepository appointmentRepository;
+    private final LoyaltyService loyaltyService;
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
+    @Transactional
     public void updateRefundPayment(Appointment appointment) throws StripeException {
         Payment payment = paymentRepository.findByAppointmentId(appointment.getId())
                 .orElseThrow(() -> new NotFoundException("No payment found for appointment."));
@@ -50,6 +53,7 @@ public class PaymentService {
     }
 
     // Session are created to be sent to webhook
+    @Transactional
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
         BigDecimal deposit = appointment.getDepositAmount();
 
@@ -70,16 +74,23 @@ public class PaymentService {
                                                                 .setName(appointment.getService().getName())
                                                                 .build())
                                                 .build())
-                                .build())
-                .putMetadata("appointmentId", appointment.getId().toString())
-                .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
-                .putMetadata("addOnIds", appointment.getAddOns().toString())
+                                .build()
+                )
+                .setPaymentIntentData(
+                        SessionCreateParams.PaymentIntentData.builder()
+                                .putMetadata("appointmentId", appointment.getId().toString())
+                                .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
+                                .putMetadata("addOnIds", appointment.getAddOns().toString())
+                                .putMetadata("paymentType", "deposit")
+                                .build()
+                )
                 .build();
 
         Session session = Session.create(params);
 
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
+                .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(deposit)
                 .paymentStatus(PaymentStatus.PENDING)
                 .appointment(appointment)
@@ -92,6 +103,7 @@ public class PaymentService {
         return session;
     }
 
+    @Transactional
     public Session createFinalPaymentSession(Appointment appointment, String successUrl, String cancelUrl, BigDecimal tipAmount) throws StripeException {
         if (tipAmount == null) {
             tipAmount = BigDecimal.ZERO;
@@ -141,16 +153,21 @@ public class PaymentService {
                 .setCancelUrl(cancelUrl)
                 .setCustomerEmail(appointment.getUser().getEmail())
                 .addAllLineItem(lineItems)
-                .putMetadata("appointmentId", appointment.getId().toString())
-                .putMetadata("userId", appointment.getUser().getId().toString())
-                .putMetadata("tipAmount", tipAmount.toString())
-                .putMetadata("paymentType", "final")
+                .setPaymentIntentData(
+                    SessionCreateParams.PaymentIntentData.builder()
+                            .putMetadata("appointmentId", appointment.getId().toString())
+                            .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
+                            .putMetadata("tipAmount", tipAmount.toString())
+                            .putMetadata("paymentType", "final")
+                            .build()
+                )
                 .build();
 
         Session session = Session.create(params);
 
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
+                .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(finalAmount)
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING)
@@ -164,69 +181,63 @@ public class PaymentService {
         return session;
     }
 
-    // Called by webhook endpoint and is triggered after payment completes/fails
-    public void handleFinalCheckoutCompleted(Session session){
-        String appointmentIdString = session.getMetadata().get("appointmentId");
-        String tipString = session.getMetadata().get("tipAmount");
+    @Transactional
+    public void handlePaymentIntentSucceeded(PaymentIntent paymentIntent) {
+        String paymentType = paymentIntent.getMetadata().get("paymentType");
+        String appointmentIdString = paymentIntent.getMetadata().get("appointmentId");
 
-        UUID appointmentId = UUID.fromString(appointmentIdString);
-        BigDecimal tipAmount = tipString != null ? new BigDecimal(tipString) : BigDecimal.ZERO;
-
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found for final payment."));
-
-        Payment payment = paymentRepository.findByStripeSessionId(session.getId())
-                .orElseThrow(() -> new NotFoundException("Payment not found for final payment."));
-
-        payment.setPaymentStatus(PaymentStatus.COMPLETED);
-        payment.setTipAmount(tipAmount);
-        paymentRepository.save(payment);
-
-        appointment.setTipAmount(tipAmount);
-        appointment.setPaymentStatus(PaymentStatus.COMPLETED);
-        appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-        appointmentRepository.save(appointment);
-
-        log.info("Final payment completed for appointment {}", appointmentId);
-    }
-
-    public void handleDepositCheckoutCompleted(Session session) {
-        String appointmentIdString = session.getMetadata().get("appointmentId");
-        String userIdString = session.getMetadata().get("userId");
-
-        if (appointmentIdString == null) {
-            log.warn("Missing appointmentId metadata in deposit session");
+        if (paymentType == null || appointmentIdString == null) {
+            log.warn("Missing metadata on PaymentIntent {}: appointmentId/paymentType", paymentIntent.getId());
             return;
         }
 
-        if (userIdString == null) {
-            log.warn("Missing userId metadata in deposit session");
+        Appointment appointment = appointmentRepository.findById(UUID.fromString(appointmentIdString))
+                .orElseThrow(() -> new NotFoundException("Appointment not found: " + appointmentIdString));
+
+        Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntent.getId())
+                .orElseThrow(() -> new NotFoundException("Payment not found for appointment: " + appointmentIdString));
+
+        if ((payment.getPaymentStatus() == PaymentStatus.COMPLETED && "final".equals(paymentType)) ||
+                (payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT && "deposit".equals(paymentType))
+        ) {
+            log.info("PaymentIntent {} already processed (status={})", paymentIntent.getId(), payment.getPaymentStatus());
             return;
         }
 
-        UUID appointmentId = UUID.fromString(appointmentIdString);
+        if ("deposit".equals(paymentType)) {
+            payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+            paymentRepository.save(payment);
 
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found for deposit."));
+            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+            appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+            appointmentRepository.save(appointment);
 
-        Payment payment = paymentRepository.findByStripeSessionId(session.getId())
-                .orElseThrow(() -> new NotFoundException("Payment not found for deposit"));
+            log.info("Deposit completed via paymentIntent {} for appointment {}", paymentIntent.getId(), appointmentIdString);
+        } else if ("final".equals(paymentType)) {
+            payment.setPaymentStatus(PaymentStatus.COMPLETED);
+            paymentRepository.save(payment);
 
-        payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
-        paymentRepository.save(payment);
+            appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
+            appointment.setPaymentStatus(PaymentStatus.COMPLETED);
+            // award loyalty points with idempotent flag
+            if (!appointment.isLoyaltyApplied()) {
+                loyaltyService.awardForCompletedAppointment(appointment.getUser());
+                appointment.setLoyaltyApplied(true);
+            }
+            appointmentRepository.save(appointment);
 
-        appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
-        appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
-        appointmentRepository.save(appointment);
-
-        log.info("Deposit marked as paid for appointment {}", appointmentId);
+            log.info("Final payment completed via paymentIntent {} for appointment {}", paymentIntent.getId(), appointmentIdString);
+        } else {
+            log.warn("Unknown paymentType {} on paymentIntent {}", paymentType, paymentIntent.getId());
+        }
     }
 
-    public void handlePaymentFailed(Session session) {
-        String appointmentIdString = session.getMetadata().get("appointmentId");
+    @Transactional
+    public void handlePaymentIntentFailed(PaymentIntent paymentIntent) {
+        String appointmentIdString = paymentIntent.getMetadata().get("appointmentId");
 
         if (appointmentIdString == null) {
-            log.warn("No appointment ID found in failed payment session.");
+            log.warn("PaymentIntent missing appointmentId metadata. paymentIntent: {}", paymentIntent.getId());
             return;
         }
 
@@ -237,7 +248,7 @@ public class PaymentService {
                     appointment.setAppointmentStatus(AppointmentStatus.PAYMENT_FAILED);
                     appointment.setPaymentStatus(PaymentStatus.FAILED);
                     appointmentRepository.save(appointment);
-                    log.info("Appointment {} marked as PAYMENT_FAILED.", appointmentId);
+                    log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, paymentIntent.getId());
                 });
     }
 }

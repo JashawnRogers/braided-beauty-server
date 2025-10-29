@@ -8,6 +8,7 @@ import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
+import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
 import lombok.AllArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -39,12 +40,11 @@ public class AuthService {
         User newUser = new User();
         newUser.setEmail(dto.getEmail());
         newUser.setName(dto.getName() != null ? dto.getName() : null);
-        newUser.setPhoneNumber(dto.getPhoneNumber() != null ? dto.getPhoneNumber() : null);
+        newUser.setPhoneNumber(PhoneNormalizer.toE164(dto.getPhoneNumber()).orElse(null));
         newUser.setUserType(UserType.MEMBER);
         newUser.setPassword(passwordEncoder.encode(dto.getPassword()));
 
-        LoyaltyRecord loyaltyRecord = new LoyaltyRecord();
-        loyaltyRecord.setUser(newUser);
+        LoyaltyRecord loyaltyRecord = new LoyaltyRecord(newUser);
         newUser.setLoyaltyRecord(loyaltyRecord);
         userRepository.save(newUser);
     }

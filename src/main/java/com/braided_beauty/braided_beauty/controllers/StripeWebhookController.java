@@ -4,7 +4,7 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.services.PaymentService;
-import com.stripe.model.checkout.Session;
+import com.stripe.model.PaymentIntent;
 import com.stripe.net.Webhook;
 import com.stripe.model.Event;
 import com.stripe.exception.SignatureVerificationException;
@@ -42,8 +42,8 @@ public class StripeWebhookController {
     }
 
     private static final Set<String> ALLOWED_EVENTS = Set.of(
-            "checkout.session.completed",      // confirms user completed checkout
-            "payment_intent.payment_failed"   // payment failed
+            "payment_intent.payment_failed",
+            "payment_intent.succeeded"
 
     );
 
@@ -62,7 +62,7 @@ public class StripeWebhookController {
     @PostMapping
     public ResponseEntity<String> handleWebhook(@RequestBody String payload,
                                                 @Parameter(name = "Stripe-Signature", in = ParameterIn.HEADER, required = true, description = "Stripe signature header")
-                                                @RequestHeader String sigHeader) {
+                                                @RequestHeader("Stripe-Signature") String sigHeader) {
         Event event;
 
         try{
@@ -71,35 +71,37 @@ public class StripeWebhookController {
             return ResponseEntity.badRequest().body("Invalid signature.");
         }
 
+        // So that Stripe doesn't keep retrying to grab the event
         if (!ALLOWED_EVENTS.contains(event.getType())) {
             log.info("Ignoring event type: {}", event.getType());
-            // So that Stripe doesn't keep retrying to grab the event
             return ResponseEntity.ok("Event type ignored.");
         }
 
        switch (event.getType()) {
-          case "checkout.session.completed" -> {
-              Session session = (Session) event.getDataObjectDeserializer()
+          case "payment_intent.succeeded" -> {
+              PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
                       .getObject()
-                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize session object."));
+                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize PaymentIntent."));
 
-              String paymentType = session.getMetadata().get("paymentType");
+              String paymentType = paymentIntent.getMetadata().get("paymentType");
 
               if ("deposit".equals(paymentType)){
-                  paymentService.handleDepositCheckoutCompleted(session);
-                  log.info("Deposit success.");
+                  paymentService.handlePaymentIntentSucceeded(paymentIntent);
+                  log.info("Deposit success. paymentIntent: {}", paymentIntent.getId());
               } else if ("final".equals(paymentType)) {
-                  paymentService.handleFinalCheckoutCompleted(session);
-                  log.info("Final payment success");
+                  paymentService.handlePaymentIntentSucceeded(paymentIntent);
+                  log.info("Final payment success. paymentIntent: {}", paymentIntent.getId());
               }
           }
           case "payment_intent.payment_failed" -> {
-              Session session = (Session) event.getDataObjectDeserializer()
-                              .getObject()
-                                      .orElseThrow(() -> new NotFoundException("Session object not found."));
-              paymentService.handlePaymentFailed(session);
-              log.warn("Payment failed: {}", session);
+              PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
+                      .getObject()
+                      .orElseThrow(() -> new NotFoundException("Payment object not found."));
+              paymentService.handlePaymentIntentFailed(paymentIntent);
+              log.warn("Payment failed: {}", paymentIntent.getId());
           }
+          default -> log.info("Unhandled event type: {}", event.getType());
+
        }
 
         return ResponseEntity.ok("{\"received\" : true}");
