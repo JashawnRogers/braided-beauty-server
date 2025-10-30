@@ -48,4 +48,7 @@ public class ServiceModel {
 
     @Column(name = "times_booked")
     private Integer timesBooked;
+
+    @Column(name = "category")
+    private String category;
 }

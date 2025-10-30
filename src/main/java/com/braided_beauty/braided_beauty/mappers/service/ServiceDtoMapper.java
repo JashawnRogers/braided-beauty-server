@@ -32,6 +32,7 @@ public class ServiceDtoMapper {
 
         if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName());
         if (dto.getDescription() != null) service.setDescription(dto.getDescription());
+        if (dto.getCategory() != null && !dto.getCategory().isBlank()) service.setCategory(dto.getCategory());
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
         if (dto.getPrice() != null) service.setDepositAmount(getDepositAmount(dto.getPrice()));
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
@@ -47,6 +48,7 @@ public class ServiceDtoMapper {
     public ServiceResponseDTO toDto(ServiceModel service){
         return ServiceResponseDTO.builder()
                 .id(service.getId())
+                .category(service.getCategory())
                 .name(service.getName())
                 .description(service.getDescription())
                 .price(service.getPrice())
@@ -59,6 +61,7 @@ public class ServiceDtoMapper {
 
     public void updateDto(ServiceRequestDTO dto, ServiceModel service) {
         if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName().trim());
+        if (dto.getCategory() != null && !dto.getCategory().isBlank()) service.setCategory(dto.getCategory().trim());
         if (dto.getDescription() != null) service.setDescription(dto.getDescription().trim());
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
         if (dto.getDepositAmount() != null) service.setDepositAmount(dto.getDepositAmount());

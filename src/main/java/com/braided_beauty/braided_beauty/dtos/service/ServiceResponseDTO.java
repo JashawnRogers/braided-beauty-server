@@ -12,6 +12,7 @@ import java.util.UUID;
 @Setter
 public class ServiceResponseDTO {
     private final UUID id;
+    private final String category;
     private final String name;
     private final String description;
     private final BigDecimal price;

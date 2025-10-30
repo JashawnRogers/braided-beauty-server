@@ -14,6 +14,7 @@ import java.util.List;
 @Getter
 @Setter
 public class ServiceCreateDTO {
+    private String category;
     @Size(min = 1, max = 150)
     private String name;
     @Size(max = 500)

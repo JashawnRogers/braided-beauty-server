@@ -27,6 +27,7 @@ import java.util.UUID;
 public class ServiceRequestDTO {
 
     private UUID serviceId;
+    private String category;
     @Size(min = 1, max = 150, message = "Name must be at least 1 character and more than 150.")
     private String name;
     @Size(max = 500, message = "Description must be no more than 500 characters.")
