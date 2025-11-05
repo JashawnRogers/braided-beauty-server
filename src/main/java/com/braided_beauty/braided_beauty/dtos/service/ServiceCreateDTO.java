@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.service;
 
+import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -14,7 +15,7 @@ import java.util.List;
 @Getter
 @Setter
 public class ServiceCreateDTO {
-    private String category;
+    private ServiceCategory category;
     @Size(min = 1, max = 150)
     private String name;
     @Size(max = 500)

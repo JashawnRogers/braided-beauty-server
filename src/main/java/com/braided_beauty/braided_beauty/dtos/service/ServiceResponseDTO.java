@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.service;
 
+import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -12,7 +13,7 @@ import java.util.UUID;
 @Setter
 public class ServiceResponseDTO {
     private final UUID id;
-    private final String category;
+    private final ServiceCategory category;
     private final String name;
     private final String description;
     private final BigDecimal price;

@@ -20,35 +20,40 @@ public class ServiceModel {
     @GeneratedValue
     private UUID id;
 
+    @Column(nullable = false, length = 120)
     private String name;
+    @Column(columnDefinition = "text")
     private String description;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    @Column(name = "deposit_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal depositAmount;
 
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
     @ElementCollection
-    @CollectionTable(name ="service_key", joinColumns = @JoinColumn(name = "service_id"))
-    @Column(name = "url")
+    @CollectionTable(name ="service_keys", joinColumns = @JoinColumn(name = "service_id"))
+    @Column(name = "url", length = 512)
+    @OrderColumn(name = "position")
     private List<String> photoKeys = new ArrayList<>();
 
     @Column(name = "video_key")
     private String videoKey;
 
     @OneToMany(mappedBy = "service")
+    @OrderBy("startAt DESC")
     private List<Appointment> appointments;
 
-    @Column(name = "deposit_amount", nullable = false)
-    private BigDecimal depositAmount;
-
     @Column(name ="points_earned", nullable = false)
-    private Integer pointsEarned;
+    private Integer pointsEarned = 0;
 
     @Column(name = "times_booked")
-    private Integer timesBooked;
+    private Integer timesBooked = 0;
 
-    @Column(name = "category")
-    private String category;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory category;
 }
