@@ -101,7 +101,7 @@ public class ServiceCategoryService {
             throw new IllegalArgumentException("Category id is required");
         }
         // preflight FK usage check
-        if (repo.existsByCategoryId(id)) {
+        if (repo.existsById(id)) {
             throw new ConflictException("Cannot delete category: it’s used by one or more services");
         }
 

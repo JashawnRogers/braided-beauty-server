@@ -10,6 +10,5 @@ import java.util.UUID;
 public interface ServiceCategoryRepository extends JpaRepository<ServiceCategory, UUID> {
     boolean existsByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCaseAndIdNot(String name, UUID id);
-    boolean existsByCategoryId(UUID id);
 }
 
