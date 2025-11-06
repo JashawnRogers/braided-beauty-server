@@ -10,6 +10,7 @@ import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.serviceCategory.ServiceCategoryDtoMapper;
 import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import com.braided_beauty.braided_beauty.repositories.ServiceCategoryRepository;
+import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -29,6 +30,7 @@ import java.util.UUID;
 public class ServiceCategoryService {
     private final ServiceCategoryDtoMapper mapper;
     private final ServiceCategoryRepository repo;
+    private final ServiceRepository serviceRepo;
 
     @Transactional
     public ServiceCategoryResponseDTO create(ServiceCategoryCreateDTO dto) {
@@ -101,7 +103,7 @@ public class ServiceCategoryService {
             throw new IllegalArgumentException("Category id is required");
         }
         // preflight FK usage check
-        if (repo.existsById(id)) {
+        if (serviceRepo.existsByCategoryId(id)) {
             throw new ConflictException("Cannot delete category: it’s used by one or more services");
         }
 

@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface ServiceRepository extends JpaRepository<ServiceModel, UUID> {
     boolean existsByName(String name);
     Optional<ServiceModel> findTopByOrderByTimesBookedDesc();
+    boolean existsByCategoryId(UUID id);
 }
