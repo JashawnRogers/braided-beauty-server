@@ -19,7 +19,7 @@ import java.util.UUID;
 public class ServiceCategoryController {
     private final ServiceCategoryService service;
 
-    @PutMapping
+    @PostMapping
     public ResponseEntity<ServiceCategoryResponseDTO> create(@Valid @RequestBody ServiceCategoryCreateDTO dto) {
         return ResponseEntity.ok(service.create(dto));
     }
