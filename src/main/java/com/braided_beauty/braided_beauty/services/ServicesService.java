@@ -6,12 +6,19 @@ import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
+import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.repositories.ServiceCategoryRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,17 +28,34 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ServicesService {
     private final ServiceRepository serviceRepository;
+    private final ServiceCategoryRepository categoryRepository;
     private final ServiceDtoMapper serviceDtoMapper;
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
     @Transactional
     public ServiceResponseDTO createService(ServiceCreateDTO dto){
-        ServiceModel service = serviceDtoMapper.create(dto);
-        if (serviceRepository.existsByName(service.getName())){
+        if (dto.getName() == null || dto.getName().isBlank()) {
+            throw new IllegalArgumentException("A service name must be provided to create a service");
+        }
+
+        if (dto.getPrice() == null) {
+            throw new IllegalArgumentException("Price is required");
+        }
+
+        if (serviceRepository.existsByName(dto.getName().trim())){
             throw new DuplicateEntityException("A service with this name already exists.");
         }
-        log.info("Created service with ID: {}", service.getId());
-        return serviceDtoMapper.toDto(service);
+
+        ServiceModel entity = serviceDtoMapper.create(dto);
+        if (dto.getCategoryId() != null) {
+            ServiceCategory category = categoryRepository.getReferenceById(dto.getCategoryId());
+            entity.setCategory(category);
+        }
+
+
+        ServiceModel saved = serviceRepository.save(entity);
+        log.info("Created service with ID: {}", saved.getId());
+        return serviceDtoMapper.toDto(saved);
     }
 
     @Transactional
@@ -51,12 +75,17 @@ public class ServicesService {
         return serviceDtoMapper.toDto(existingService);
     }
 
-    public List<ServiceResponseDTO> getAllServices(){
-        List<ServiceModel> allServices = serviceRepository.findAll();
-        log.info("Returning all services: {}", allServices.size());
-        return allServices.stream()
-                .map(serviceDtoMapper::toDto)
-                .toList();
+    public Page<ServiceResponseDTO> getAllServices(String name, Pageable pageable){
+        Specification<ServiceModel> spec =
+                (root, query, criteriaBuilder)
+                        -> criteriaBuilder.conjunction();
+
+        if (name != null && !name.isBlank()) {
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), "%" + name.toLowerCase() + "%")
+            ));
+        }
+        return serviceRepository.findAll(spec, pageable);
     }
 
     public ServiceResponseDTO getServiceById(UUID serviceId){

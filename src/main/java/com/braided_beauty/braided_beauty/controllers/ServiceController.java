@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -90,8 +92,17 @@ public class ServiceController {
                     content = @Content(schema = @Schema(implementation = ServiceResponseDTO.class)))
     })
     @GetMapping
-    public ResponseEntity<List<ServiceResponseDTO>> getAllServices(){
-        return ResponseEntity.ok(service.getAllServices());
+    public ResponseEntity<Page<ServiceResponseDTO>> getAllServices(
+            @RequestParam(required = false) String name,
+            Pageable pageable
+    ){
+        try {
+            Page<ServiceResponseDTO> page = service.getAllServices(name, pageable);
+            return ResponseEntity.ok(page);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
 

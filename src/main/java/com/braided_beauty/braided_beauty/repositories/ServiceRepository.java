@@ -1,6 +1,11 @@
 package com.braided_beauty.braided_beauty.repositories;
 
+import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
+import jakarta.annotation.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -10,4 +15,5 @@ public interface ServiceRepository extends JpaRepository<ServiceModel, UUID> {
     boolean existsByName(String name);
     Optional<ServiceModel> findTopByOrderByTimesBookedDesc();
     boolean existsByCategoryId(UUID id);
+    Page<ServiceResponseDTO> findAll(@Nullable Specification<ServiceModel> spec, Pageable pageable);
 }

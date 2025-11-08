@@ -8,6 +8,7 @@ import com.braided_beauty.braided_beauty.models.ServiceModel;
 import jakarta.annotation.Nullable;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
 
@@ -30,11 +31,15 @@ public class ServiceDtoMapper {
     public ServiceModel create(ServiceCreateDTO dto){
         ServiceModel service = new ServiceModel();
 
-        if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName());
+        if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName().trim());
+
         if (dto.getDescription() != null) service.setDescription(dto.getDescription());
-        if (dto.getCategory() != null && !dto.getCategory().getName().isBlank()) service.setCategory(dto.getCategory());
-        if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
-        if (dto.getPrice() != null) service.setDepositAmount(getDepositAmount(dto.getPrice()));
+
+        if (dto.getPrice() != null) {
+            BigDecimal price = dto.getPrice().setScale(2, RoundingMode.UNNECESSARY);
+            service.setPrice(price);
+            service.setDepositAmount(getDepositAmount(price));
+        }
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
 
         List<String> photos = normalizeKeys(dto.getPhotoKeys());
@@ -64,7 +69,6 @@ public class ServiceDtoMapper {
         if (dto.getCategory() != null) service.setCategory(dto.getCategory());
         if (dto.getDescription() != null) service.setDescription(dto.getDescription().trim());
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
-        if (dto.getDepositAmount() != null) service.setDepositAmount(dto.getDepositAmount());
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
 
         // Photos: incremental add/remove
