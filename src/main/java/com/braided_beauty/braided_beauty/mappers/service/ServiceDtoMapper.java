@@ -53,7 +53,8 @@ public class ServiceDtoMapper {
     public ServiceResponseDTO toDto(ServiceModel service){
         return ServiceResponseDTO.builder()
                 .id(service.getId())
-                .category(service.getCategory())
+                .categoryName(service.getCategory().getName())
+                .categoryId(service.getCategory().getId())
                 .name(service.getName())
                 .description(service.getDescription())
                 .price(service.getPrice())
@@ -61,6 +62,8 @@ public class ServiceDtoMapper {
                 .durationMinutes(service.getDurationMinutes())
                 .photoKeys(Optional.ofNullable(service.getPhotoKeys()).orElse(List.of()))
                 .videoKey(service.getVideoKey())
+                .createdAt(service.getCreatedAt())
+                .updatedAt(service.getUpdatedAt())
                 .build();
     }
 

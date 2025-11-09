@@ -85,7 +85,8 @@ public class ServicesService {
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), "%" + name.toLowerCase() + "%")
             ));
         }
-        return serviceRepository.findAll(spec, pageable);
+        return serviceRepository.findAll(spec, pageable)
+                .map(serviceDtoMapper::toDto);
     }
 
     public ServiceResponseDTO getServiceById(UUID serviceId){

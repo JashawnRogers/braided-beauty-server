@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @Getter
 @Setter
 public class ServiceCreateDTO {
-    @Nullable
+    @NotNull
     private UUID categoryId;
     @Size(min = 1, max = 150)
     private String name;

@@ -93,11 +93,16 @@ public class ServiceController {
     })
     @GetMapping
     public ResponseEntity<Page<ServiceResponseDTO>> getAllServices(
-            @RequestParam(required = false) String name,
+            @RequestParam(required = false, name = "name") String name,
+            @RequestParam(required = false, name = "search") String search,
             Pageable pageable
     ){
         try {
-            Page<ServiceResponseDTO> page = service.getAllServices(name, pageable);
+            String needle  = (name != null && !name.isBlank())
+                    ? name
+                    : (search != null && !search.isBlank() ? search : null);
+
+            Page<ServiceResponseDTO> page = service.getAllServices(needle, pageable);
             return ResponseEntity.ok(page);
         } catch (Exception e) {
             e.printStackTrace();
