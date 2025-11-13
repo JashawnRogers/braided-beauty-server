@@ -26,4 +26,6 @@ public class ServiceResponseDTO {
     private String videoKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<UUID> addOnIds;
+    private List<String> addOnNames;
 }

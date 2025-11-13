@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.service.PopularServiceDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceCreateDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import jakarta.annotation.Nullable;
 import org.springframework.stereotype.Component;
@@ -64,6 +65,8 @@ public class ServiceDtoMapper {
                 .videoKey(service.getVideoKey())
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
+                .addOnIds(service.getAddOns().stream().map(AddOn::getId).toList())
+                .addOnNames(service.getAddOns().stream().map(AddOn::getName).toList())
                 .build();
     }
 

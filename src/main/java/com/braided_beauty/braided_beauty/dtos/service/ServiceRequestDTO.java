@@ -39,6 +39,8 @@ public class ServiceRequestDTO {
     private BigDecimal depositAmount;
     @Min(value = -1, message = "Duration of service must not be a negative number.")
     private Integer durationMinutes;
+    @Nullable
+    private List<UUID> addOnIds = List.of();
 
     // Media state deltas:
     // If null -> leave unchanged - If present -> apply changes

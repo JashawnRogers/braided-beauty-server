@@ -6,8 +6,10 @@ import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.repositories.AddOnRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceCategoryRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import jakarta.transaction.Transactional;
@@ -30,6 +32,7 @@ public class ServicesService {
     private final ServiceRepository serviceRepository;
     private final ServiceCategoryRepository categoryRepository;
     private final ServiceDtoMapper serviceDtoMapper;
+    private final AddOnRepository addOnRepository;
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
     @Transactional
@@ -48,8 +51,15 @@ public class ServicesService {
 
         ServiceModel entity = serviceDtoMapper.create(dto);
         if (dto.getCategoryId() != null) {
-            ServiceCategory category = categoryRepository.getReferenceById(dto.getCategoryId());
-            entity.setCategory(category);
+            ServiceCategory categoryProxy = categoryRepository.getReferenceById(dto.getCategoryId());
+            entity.setCategory(categoryProxy);
+        }
+
+        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
+            List<AddOn> addOnProxies = dto.getAddOnIds().stream()
+                    .map(addOnRepository::getReferenceById).toList();
+
+            entity.setAddOns(addOnProxies);
         }
 
 
@@ -70,7 +80,13 @@ public class ServicesService {
     public ServiceResponseDTO updateService(UUID serviceId, ServiceRequestDTO serviceRequestDTO){
         ServiceModel existingService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
+
         serviceDtoMapper.updateDto(serviceRequestDTO, existingService);
+
+        if (serviceRequestDTO.getAddOnIds() != null && !serviceRequestDTO.getAddOnIds().isEmpty()) {
+            existingService.setAddOns(addOnRepository.findAllById(serviceRequestDTO.getAddOnIds()));
+        }
+
         log.info("Updated service with ID: {}", serviceId);
         return serviceDtoMapper.toDto(existingService);
     }

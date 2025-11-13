@@ -30,4 +30,6 @@ public class ServiceCreateDTO {
     private Integer durationMinutes;
     private List<String> photoKeys;
     private String videoKey;
+    @Nullable
+    private List<UUID> addOnIds = List.of();
 }

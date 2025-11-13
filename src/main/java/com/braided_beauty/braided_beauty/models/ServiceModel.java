@@ -59,6 +59,15 @@ public class ServiceModel {
     @JoinColumn(name = "category_id", nullable = false)
     private ServiceCategory category;
 
+    @ManyToMany
+    @JoinTable(
+            name = "service_addons",
+            joinColumns = @JoinColumn(name = "service_id"),
+            inverseJoinColumns = @JoinColumn(name = "add_on_id")
+    )
+    @OrderBy("name ASC")
+    private List<AddOn> addOns = new ArrayList<>();
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
