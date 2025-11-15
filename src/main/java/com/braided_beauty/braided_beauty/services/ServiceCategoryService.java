@@ -17,10 +17,14 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -90,11 +94,17 @@ public class ServiceCategoryService {
         return mapper.toDto(category);
     }
 
-    public List<ServiceCategoryResponseDTO> getAllCategories() {
-        return repo.findAll(Sort.by("name").ascending())
-                .stream()
-                .map(mapper::toDto)
-                .toList();
+    public Page<ServiceCategoryResponseDTO> getAllCategories(String search, Pageable pageable) {
+        Specification<ServiceCategory> spec = ((root, q, cb) -> cb.conjunction());
+
+        if (search != null && !search.isBlank()) {
+            Specification<ServiceCategory> byName =
+                    (root, q, cb) ->
+                            cb.like(cb.lower(root.get("name")), "%" + search.trim().toLowerCase(Locale.ROOT) + "%");
+        }
+
+        return repo.findAll(spec, pageable)
+                .map(mapper::toDto);
     }
 
     @Transactional

@@ -47,7 +47,7 @@ public class AddOnController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AddOnResponseDTO> update(@RequestBody AddOnRequestDTO dto, @Valid @PathVariable UUID id) {
+    public ResponseEntity<AddOnResponseDTO> update(@Valid @RequestBody AddOnRequestDTO dto, @PathVariable UUID id) {
         dto.setId(id); // Trust path param as the source of truth
         return ResponseEntity.ok(addOnService.save(dto));
     }

@@ -1,16 +1,17 @@
 package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.serviceCategory.ServiceCategoryCreateDTO;
-import com.braided_beauty.braided_beauty.dtos.serviceCategory.ServiceCategoryUpdateDTO;
 import com.braided_beauty.braided_beauty.dtos.serviceCategory.ServiceCategoryResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.serviceCategory.ServiceCategoryUpdateDTO;
 import com.braided_beauty.braided_beauty.services.ServiceCategoryService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -24,14 +25,29 @@ public class ServiceCategoryController {
         return ResponseEntity.ok(service.create(dto));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ServiceCategoryResponseDTO> update(@Valid @RequestBody ServiceCategoryUpdateDTO dto, @PathVariable UUID id) {
+        return ResponseEntity.ok(service.update(dto, id));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ServiceCategoryResponseDTO> getCategory(@PathVariable UUID id) {
         return ResponseEntity.ok(service.getCategory(id));
     }
 
     @GetMapping
-    public ResponseEntity<List<ServiceCategoryResponseDTO>> getCategories() {
-        return ResponseEntity.ok(service.getAllCategories());
+    public ResponseEntity<Page<ServiceCategoryResponseDTO>> getAllAddOns(
+            @RequestParam(required = false) String search,
+            Pageable pageable
+    ) {
+        try {
+            Page<ServiceCategoryResponseDTO> page = service.getAllCategories(search, pageable);
+            return ResponseEntity.ok(page);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+
     }
 
     @DeleteMapping("/{id}")
