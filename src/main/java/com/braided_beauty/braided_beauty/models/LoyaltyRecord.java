@@ -17,11 +17,11 @@ import java.util.UUID;
 @Setter
 public class LoyaltyRecord {
     @Id
-    @Column(name = "user_id")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
     @OneToOne
-    @MapsId
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 

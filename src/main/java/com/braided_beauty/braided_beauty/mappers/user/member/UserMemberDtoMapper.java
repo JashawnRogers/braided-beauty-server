@@ -1,5 +1,7 @@
 package com.braided_beauty.braided_beauty.mappers.user.member;
 
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
@@ -65,6 +67,17 @@ public class UserMemberDtoMapper {
                         .collect(Collectors.toList())
                 )
                 .loyaltyRecord(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
+                .build();
+    }
+
+    public UserDashboardDTO toDashboardDTO(User user, AppointmentSummaryDTO aptDTO) {
+        return UserDashboardDTO.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .loyaltyRecord(user.getLoyaltyRecord())
+                .appointmentCount(user.getAppointments().size())
+                .nextApt(aptDTO)
                 .build();
     }
 }

@@ -105,7 +105,14 @@ public class RefreshTokenService {
 
         // Create new access token for user
         var auth = buildAuthForUser(currentToken.getUser().getId());
-        String newAccessToken = jwtService.generateAccessToken(auth);
+        AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
+
+        String newAccessToken = jwtService.generateAccessToken(
+                principal.id(),
+                principal.email(),
+                principal.name(),
+                principal.authorities()
+        );
 
         return RotateTokensDTO.builder()
                 .newAccessToken(newAccessToken)
@@ -165,7 +172,7 @@ public class RefreshTokenService {
         var principal = new AppUserPrincipal(
                 user.getId(),
                 user.getEmail(),
-                user.getName() != null ? user.getName() : null,
+                user.getName() != null ? user.getName() : user.getEmail(),
                 authorities
         );
 

@@ -4,13 +4,16 @@ import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.AuthService;
 import com.braided_beauty.braided_beauty.services.JwtService;
 import com.braided_beauty.braided_beauty.services.RefreshTokenService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 import java.time.Duration;
+import java.util.UUID;
 
 @Configuration
 public class OAuthHandlersConfig {
@@ -18,20 +21,34 @@ public class OAuthHandlersConfig {
     @Bean
     AuthenticationSuccessHandler oauth2SuccessHandler(AuthService authService, JwtService jwtService,
                                                       RefreshTokenService refreshTokenService) {
-        return (req, res, oauthAuth) -> {
-            var appAuth = authService.toAppAuthentication(oauthAuth);
-            String accessToken = jwtService.generateAccessToken(appAuth);
+        return (req, res, authentication) -> {
+            // Convert provider Authentication to AppUserPrincipal based Authentication
+            Authentication appAuth = authService.toAppAuthentication(authentication);
+            AppUserPrincipal principal = (AppUserPrincipal) appAuth.getPrincipal();
 
-            var principal = (AppUserPrincipal) appAuth.getPrincipal();
-            var issued = refreshTokenService.issueForUser(principal.getId(), "web");
+            UUID userId = principal.id();
+            String email = principal.email();
+            String name = principal.name();
 
-            var cookie = ResponseCookie.from("refreshToken", issued.getRefreshToken())
-                    .httpOnly(true).secure(true).sameSite("None").path("/")
-                    .maxAge(Duration.ofDays(14)).build();
-            res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+            String accessToken = jwtService.generateAccessToken(userId, email, name, appAuth.getAuthorities());
 
-            res.setContentType("application/json");
-            res.getWriter().write("{\"accessToken\":\"" + accessToken + "\"}");
+            var issued = refreshTokenService.issueForUser(userId, "web");
+            addRefreshToken(res, issued.getRefreshToken());
+
+            // Deliver accessToken back to frontend
+            res.sendRedirect("http://localhost:5173/auth/callback?token=" + accessToken);
         };
+    }
+
+    private void addRefreshToken(HttpServletResponse res, String refreshToken) {
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("None")
+                .path("/")
+                .maxAge(Duration.ofDays(14))
+                .build();
+
+        res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }

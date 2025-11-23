@@ -3,6 +3,7 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.CancelAppointmentDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -145,5 +147,17 @@ public class AppointmentService {
         return appointments.stream()
                 .map(appointmentDtoMapper::toDTO)
                 .toList();
+    }
+
+    public Optional<AppointmentSummaryDTO> getNextAppointment(UUID userId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<AppointmentStatus> statuses = List.of(
+                AppointmentStatus.BOOKED,
+                AppointmentStatus.CONFIRMED
+        );
+
+        return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, statuses)
+                .map(appointmentDtoMapper::toSummaryDTO);
     }
 }

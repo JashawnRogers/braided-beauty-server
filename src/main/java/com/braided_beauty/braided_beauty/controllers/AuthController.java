@@ -2,7 +2,7 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.user.auth.LoginRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
-import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
+import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.services.AuthService;
 import com.braided_beauty.braided_beauty.services.JwtService;
 import com.braided_beauty.braided_beauty.services.RefreshTokenService;
@@ -61,16 +61,18 @@ public class AuthController {
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
 
-        String token = jwtService.generateAccessToken(auth);
+        User user = userService.findUserByEmailOrThrow(dto.getEmail());
 
-        // Issue refresh token for user
-        UUID userId = userService.findUserIdByEmail(dto.getEmail());
+        UUID userId = user.getId();
+        String email = user.getEmail();
+        String name = user.getName();
+
+        String accesToken = jwtService.generateAccessToken(userId, email, name, auth.getAuthorities());
+
         var issued = refreshTokenService.issueForUser(userId, "web");
-
-        // Set HttpOnly refresh cookie
         addRefreshCookie(res, issued.getRefreshToken());
 
-        return ResponseEntity.ok(Map.of("accessToken", token));
+        return ResponseEntity.ok(Map.of("accessToken", accesToken));
     }
 
     @Operation(
@@ -88,20 +90,22 @@ public class AuthController {
     })
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody UserRegistrationDTO dto, HttpServletResponse res) {
-        authService.register(dto);
+        User user = authService.register(dto);
 
-        // Immediately authenticate to be able to create tokens
         Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.password)
         );
 
-        UUID userId = ((AppUserPrincipal) auth.getPrincipal()).getId();
+        UUID userId = user.getId();
+        String email = dto.getEmail();
+        String name = dto.getName();
 
-        String token = jwtService.generateAccessToken(auth);
+        String accessToken = jwtService.generateAccessToken(userId, email, name, auth.getAuthorities());
+
         var issued = refreshTokenService.issueForUser(userId, "web");
         addRefreshCookie(res, issued.getRefreshToken());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("accessToken", token));
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("accessToken", accessToken));
     }
 
 

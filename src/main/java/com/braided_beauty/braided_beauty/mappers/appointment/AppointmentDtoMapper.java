@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.mappers.appointment;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.Appointment;
@@ -35,6 +36,15 @@ public class AppointmentDtoMapper {
                 .updatedAt(appointment.getUpdatedAt())
                 .note(appointment.getNote())
                 .addOns(appointment.getAddOns())
+                .build();
+    }
+
+    public AppointmentSummaryDTO toSummaryDTO(Appointment appointment) {
+        return AppointmentSummaryDTO.builder()
+                .id(appointment.getId())
+                .serviceName(appointment.getService().getName())
+                .appointmentTime(appointment.getAppointmentTime())
+                .appointmentStatus(appointment.getAppointmentStatus())
                 .build();
     }
 }

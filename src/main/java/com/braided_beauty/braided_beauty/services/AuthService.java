@@ -32,21 +32,22 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public void register(UserRegistrationDTO dto){
+    public User register(UserRegistrationDTO dto){
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new DuplicateEntityException("Email already in use.");
         }
 
         User newUser = new User();
         newUser.setEmail(dto.getEmail());
-        newUser.setName(dto.getName() != null ? dto.getName() : null);
+        newUser.setName(dto.getName() != null ? dto.getName() : dto.getEmail());
         newUser.setPhoneNumber(PhoneNormalizer.toE164(dto.getPhoneNumber()).orElse(null));
         newUser.setUserType(UserType.MEMBER);
         newUser.setPassword(passwordEncoder.encode(dto.getPassword()));
 
         LoyaltyRecord loyaltyRecord = new LoyaltyRecord(newUser);
         newUser.setLoyaltyRecord(loyaltyRecord);
-        userRepository.save(newUser);
+
+        return userRepository.save(newUser);
     }
 
     @Transactional

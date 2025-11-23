@@ -4,9 +4,11 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.UserAdminAnalyticsDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.UserSummaryResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
+import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -77,7 +79,7 @@ public class UserController {
     public ResponseEntity<List<AppointmentResponseDTO>> getAppointmentHistory(
             @Parameter(hidden = true) @AuthenticationPrincipal AppUserPrincipal principal) {
         return ResponseEntity.ok(userService.getAppointmentHistory(principal
-                .getId()));
+                .id()));
     }
 
     @Operation(
@@ -92,7 +94,7 @@ public class UserController {
     public ResponseEntity<LoyaltyRecordResponseDTO> getLoyaltyPoints(
             @Parameter(hidden = true) @AuthenticationPrincipal AppUserPrincipal principal) {
         return ResponseEntity.ok(userService.getLoyaltyPoints(principal
-                .getId()));
+                .id()));
     }
 
     @Operation(
@@ -230,5 +232,21 @@ public class UserController {
     @PutMapping("/{userId}")
     public ResponseEntity<UserMemberProfileResponseDTO> updateMemberData(@PathVariable UUID userId, @RequestBody UserMemberRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.OK).body(userService.updateMemberData(dto));
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserDashboardDTO> getDashboard(@PathVariable UUID userId) {
+        return ResponseEntity.ok(userService.getDashboard(userId));
+    }
+
+    @GetMapping("/dashboard/me")
+    public ResponseEntity<UserDashboardDTO> getMyDashboard(
+            @AuthenticationPrincipal AppUserPrincipal principal
+    ) {
+        if (principal == null) {
+            throw new UnauthorizedException("User is not authenticated");
+        }
+
+        return ResponseEntity.ok(userService.getDashboard(principal.id()));
     }
 }

@@ -1,8 +1,10 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.*;
+import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
@@ -40,6 +42,7 @@ public class UserService {
     private final ServiceRepository serviceRepository;
     private final UserMemberDtoMapper userMemberDtoMapper;
     private final AppointmentDtoMapper appointmentDtoMapper;
+    private final AppointmentService appointmentService;
     private final ServiceDtoMapper serviceDtoMapper;
     private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
     private final UserAdminMapper userAdminMapper;
@@ -157,8 +160,9 @@ public class UserService {
     }
 
     public UUID findUserIdByEmail(String email) {
-        return userRepository.findUserIdByEmail(email)
+        User user = userRepository.findUserByEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
+        return user.getId();
     }
 
     @Transactional // <-- Allows JPA to push pending changes to DB
@@ -168,5 +172,18 @@ public class UserService {
         userRepository.save(UserMemberDtoMapper.toEntity(user, dto));
         // Saving is not needed due to JPA managing the entity at transaction commit
         return userMemberDtoMapper.toDTO(user);
+    }
+
+    public UserDashboardDTO getDashboard(UUID userId) {
+        User profile = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("No user found with ID: " + userId));
+
+        Optional<AppointmentSummaryDTO> nextApt = appointmentService.getNextAppointment(profile.getId());
+
+        return userMemberDtoMapper.toDashboardDTO(profile, nextApt.orElse(null));
+    }
+
+    public User findUserByEmailOrThrow(String email) {
+        return userRepository.findUserByEmail(email).orElseThrow(() -> new NotFoundException("No user found with email: " + email));
     }
 }
