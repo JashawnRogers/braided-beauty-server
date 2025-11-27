@@ -97,7 +97,6 @@ public class SecurityConfig {
                                 "/api/v1/service",
                                 "/api/v1/service/**",
                                 "/api/v1/auth/**",
-                                "/oauth2/**",
                                 "/error"
 
                         ).permitAll()

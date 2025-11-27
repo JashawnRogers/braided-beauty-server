@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.models;
 
 import com.braided_beauty.braided_beauty.enums.UserType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,7 +22,10 @@ public class User {
     private UUID id;
 
     private String email;
+
+    @JsonIgnore
     private String password;
+
     private String name;
 
     @Column(name = "phone_number")

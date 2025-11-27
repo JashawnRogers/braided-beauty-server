@@ -1,14 +1,12 @@
 package com.braided_beauty.braided_beauty.dtos.appointment;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Value
 @Builder
 @RequiredArgsConstructor
 @Getter

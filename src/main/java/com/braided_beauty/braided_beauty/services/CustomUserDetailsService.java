@@ -29,15 +29,16 @@ public class CustomUserDetailsService implements UserDetailsService {
             case GUEST -> List.of(new SimpleGrantedAuthority("ROLE_GUEST"));
         };
 
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .authorities(authorities)
-                .disabled(!user.isEnabled())
-                .accountLocked(false)
-                .accountExpired(false)
-                .credentialsExpired(false)
-                .build();
+        return new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                user.isEnabled(),
+                true, // account non expired
+                true, // credentials non expired
+                true, // account non locked
+                authorities
+        );
+
 
     }
 }

@@ -13,6 +13,7 @@ public class LoyaltyRecordDtoMapper {
         return LoyaltyRecordResponseDTO.builder()
                 .points(loyaltyRecord.getPoints())
                 .redeemedPoints(loyaltyRecord.getRedeemedPoints())
+                .isSignupBonusAwarded(loyaltyRecord.isSignupBonusAwarded())
                 .build();
     }
 

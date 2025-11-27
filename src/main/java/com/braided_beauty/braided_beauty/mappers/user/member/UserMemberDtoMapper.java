@@ -75,7 +75,7 @@ public class UserMemberDtoMapper {
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .loyaltyRecord(user.getLoyaltyRecord())
+                .loyaltyRecord(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
                 .appointmentCount(user.getAppointments().size())
                 .nextApt(aptDTO)
                 .build();
