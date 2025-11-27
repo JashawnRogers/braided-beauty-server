@@ -21,6 +21,8 @@ import com.stripe.model.checkout.Session;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -158,6 +160,19 @@ public class AppointmentService {
         );
 
         return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, statuses)
+                .map(appointmentDtoMapper::toSummaryDTO);
+    }
+
+    public Page<AppointmentSummaryDTO> getPreviousAppointments(UUID userId, Pageable pageable){
+        LocalDateTime now = LocalDateTime.now();
+
+        List<AppointmentStatus> statuses = List.of(
+                AppointmentStatus.COMPLETED,
+                AppointmentStatus.CANCELED
+        );
+
+        return appointmentRepository
+                .findUserByIdAndAppointmentTimeBeforeAndAppointmentStatusIn(userId, now, statuses, pageable)
                 .map(appointmentDtoMapper::toSummaryDTO);
     }
 }

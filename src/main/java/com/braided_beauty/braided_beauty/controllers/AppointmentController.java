@@ -2,7 +2,9 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.CancelAppointmentDTO;
+import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.AppointmentService;
 import com.stripe.exception.StripeException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,8 +15,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -108,5 +113,19 @@ public class AppointmentController {
             @Parameter(description = "Date for which to retrieve appointments (yyyy-MM-dd)", required = true, example = "2025-08-18")
             @RequestParam("date") @org.springframework.format.annotation.DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date){
         return ResponseEntity.ok(appointmentService.getAllAppointmentsByDate(date));
+    }
+
+    @GetMapping("/me/previous")
+    public ResponseEntity<Page<AppointmentSummaryDTO>> getPreviousAppointments(
+            @AuthenticationPrincipal AppUserPrincipal principal,
+            Pageable pageable
+            ) {
+        return ResponseEntity.ok(appointmentService.getPreviousAppointments(principal.id(), pageable));
+    }
+
+    @GetMapping("/me/next")
+    public ResponseEntity<AppointmentSummaryDTO> getNextAppointment(@AuthenticationPrincipal AppUserPrincipal principal){
+        AppointmentSummaryDTO nextAppointment = appointmentService.getNextAppointment(principal.id()).orElse(null);
+        return ResponseEntity.ok(nextAppointment);
     }
 }
