@@ -1,8 +1,8 @@
 package com.braided_beauty.braided_beauty.dtos.loyaltyRecord;
 
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import lombok.*;
 
-@Value
 @Builder
 @AllArgsConstructor
 @Getter
@@ -11,4 +11,5 @@ public class LoyaltyRecordResponseDTO {
     private final Integer points;
     private final Integer redeemedPoints;
     private final boolean isSignupBonusAwarded;
+    private final LoyaltyTier loyaltyTier;
 }

@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
 import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
@@ -52,7 +53,7 @@ public class UserMemberDtoMapper {
         return target;
     }
 
-    public UserMemberProfileResponseDTO toDTO(User user){
+    public UserMemberProfileResponseDTO toDTO(User user, LoyaltyTier tier){
         return UserMemberProfileResponseDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -67,15 +68,17 @@ public class UserMemberDtoMapper {
                         .collect(Collectors.toList())
                 )
                 .loyaltyRecord(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
+                .loyaltyTier(tier)
                 .build();
     }
 
-    public UserDashboardDTO toDashboardDTO(User user, AppointmentSummaryDTO aptDTO) {
+    public UserDashboardDTO toDashboardDTO(User user, LoyaltyTier tier, AppointmentSummaryDTO aptDTO) {
         return UserDashboardDTO.builder()
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .loyaltyRecord(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
+                .loyaltyTier(tier)
                 .appointmentCount(user.getAppointments().size())
                 .nextApt(aptDTO)
                 .build();

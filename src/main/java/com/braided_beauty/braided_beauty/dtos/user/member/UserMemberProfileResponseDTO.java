@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.dtos.user.member;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -32,4 +33,5 @@ public class UserMemberProfileResponseDTO {
     private final UserType userType;
     private final List<AppointmentResponseDTO> appointments;
     private final LoyaltyRecordResponseDTO loyaltyRecord;
+    private final LoyaltyTier loyaltyTier;
 }

@@ -2,11 +2,11 @@ package com.braided_beauty.braided_beauty.dtos.user.member;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import lombok.*;
 
 import java.util.UUID;
 
-@Value
 @Builder
 @RequiredArgsConstructor
 @Getter
@@ -18,4 +18,5 @@ public class UserDashboardDTO {
     private final LoyaltyRecordResponseDTO loyaltyRecord;
     private final Integer appointmentCount;
     private final AppointmentSummaryDTO nextApt;
+    private final LoyaltyTier loyaltyTier;
 }

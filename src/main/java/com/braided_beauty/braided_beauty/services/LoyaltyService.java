@@ -1,11 +1,11 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltySettingsDTO;
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
 import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
-import com.braided_beauty.braided_beauty.models.LoyaltySettings;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.repositories.LoyaltyRecordRepository;
 import com.braided_beauty.braided_beauty.repositories.LoyaltySettingsRepository;
@@ -20,6 +20,8 @@ public class LoyaltyService {
     private final LoyaltyRecordRepository recordRepo;
     private final LoyaltyRecordDtoMapper mapper;
 
+
+
     @Transactional
     public void awardSignUpBonus(User user) {
         var settings = settingsRepo.findAny()
@@ -29,7 +31,7 @@ public class LoyaltyService {
         var record = recordRepo.findById(user.getId())
                 .orElseGet(() -> recordRepo.save(new LoyaltyRecord(user)));
 
-        if (!record.isSignupBonusAwarded()) return;
+        if (record.isSignupBonusAwarded()) return;
 
         int bonus = settings.getSignUpBonusPoints() != null ? settings.getSignUpBonusPoints() : 0;
         if (bonus <= 0) return;
@@ -89,6 +91,15 @@ public class LoyaltyService {
         if (dto.getProgramEnabled() != null) {
             settings.setProgramEnabled(dto.getProgramEnabled());
         }
+        if (dto.getGoldTierThreshold() != null) {
+            settings.setGoldTierThreshold(dto.getGoldTierThreshold());
+        }
+        if (dto.getSilverTierThreshold() != null){
+            settings.setSilverTierThreshold(dto.getSilverTierThreshold());
+        }
+        if (dto.getBronzeTierThreshold() != null) {
+            settings.setBronzeTierThreshold(dto.getBronzeTierThreshold());
+        }
 
         settingsRepo.save(settings);
         return mapper.toDTO(settings);
@@ -98,5 +109,18 @@ public class LoyaltyService {
     public LoyaltySettingsDTO getSettings() {
         return mapper.toDTO(settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found")));
+    }
+
+    public LoyaltyTier calculateLoyaltyTier(int points) {
+        var settings = settingsRepo.findAny()
+                .orElseThrow(() -> new NotFoundException("Settings object not found"));
+
+        Integer goldTier = settings.getGoldTierThreshold();
+        Integer silverTier = settings.getSilverTierThreshold();
+
+        if (goldTier != null && points >= goldTier) return LoyaltyTier.GOLD;
+        if (silverTier != null && points >= silverTier) return LoyaltyTier.SILVER;
+
+        return LoyaltyTier.BRONZE;
     }
 }

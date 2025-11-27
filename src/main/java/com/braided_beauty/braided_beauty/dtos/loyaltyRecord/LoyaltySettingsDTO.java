@@ -14,4 +14,7 @@ public class LoyaltySettingsDTO {
     private Boolean programEnabled;
     private Integer signupBonusPoints;
     private Integer earnPerAppointment;
+    private Integer goldTierThreshold;
+    private Integer silverTierThreshold;
+    private Integer bronzeTierThreshold;
 }

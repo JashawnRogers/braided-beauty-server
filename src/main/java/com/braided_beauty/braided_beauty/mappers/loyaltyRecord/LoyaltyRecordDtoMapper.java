@@ -23,6 +23,9 @@ public class LoyaltyRecordDtoMapper {
                 .programEnabled(settings.isProgramEnabled())
                 .earnPerAppointment(settings.getEarnPerAppointment())
                 .signupBonusPoints(settings.getSignUpBonusPoints())
+                .goldTierThreshold(settings.getGoldTierThreshold())
+                .silverTierThreshold(settings.getSilverTierThreshold())
+                .bronzeTierThreshold(settings.getBronzeTierThreshold())
                 .build();
     }
 

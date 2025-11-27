@@ -7,6 +7,7 @@ import com.braided_beauty.braided_beauty.dtos.user.admin.*;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
+import com.braided_beauty.braided_beauty.enums.LoyaltyTier;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
@@ -46,12 +47,15 @@ public class UserService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final LoyaltyRecordDtoMapper loyaltyRecordDtoMapper;
     private final UserAdminMapper userAdminMapper;
+    private final LoyaltyService loyaltyService;
 
     public UserMemberProfileResponseDTO getMemberProfile(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User does not exist."));
 
-        return userMemberDtoMapper.toDTO(user);
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
+
+        return userMemberDtoMapper.toDTO(user, tier);
     }
 
     public List<AppointmentResponseDTO> getAppointmentHistory(UUID userId){
@@ -170,8 +174,9 @@ public class UserService {
         User user = userRepository.findById(dto.getId())
                 .orElseThrow(() -> new NotFoundException("User does not exist"));
         userRepository.save(UserMemberDtoMapper.toEntity(user, dto));
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
         // Saving is not needed due to JPA managing the entity at transaction commit
-        return userMemberDtoMapper.toDTO(user);
+        return userMemberDtoMapper.toDTO(user, tier);
     }
 
     public UserDashboardDTO getDashboard(UUID userId) {
@@ -180,7 +185,9 @@ public class UserService {
 
         Optional<AppointmentSummaryDTO> nextApt = appointmentService.getNextAppointment(profile.getId());
 
-        return userMemberDtoMapper.toDashboardDTO(profile, nextApt.orElse(null));
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(profile.getLoyaltyRecord().getPoints());
+
+        return userMemberDtoMapper.toDashboardDTO(profile, tier,nextApt.orElse(null));
     }
 
     public User findUserByEmailOrThrow(String email) {
