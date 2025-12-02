@@ -76,6 +76,13 @@ public class AddOnService {
                 .map(addOnDTOMapper::toDto);
     }
 
+    public List<AddOnResponseDTO> getAllAddOnsByList() {
+        return addOnRepository.findAll()
+                .stream()
+                .map(addOnDTOMapper::toDto)
+                .toList();
+    }
+
     @Transactional
     public AddOnResponseDTO save(AddOnRequestDTO dto) {
         AddOn addOn;

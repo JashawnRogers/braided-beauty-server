@@ -1,6 +1,8 @@
 package com.braided_beauty.braided_beauty.mappers.user.member;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
+import com.braided_beauty.braided_beauty.dtos.user.global.CurrentUserDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UpdateMemberProfileDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
@@ -13,6 +15,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.braided_beauty.braided_beauty.utils.PhoneNormalizer.toE164;
@@ -72,6 +75,24 @@ public class UserMemberDtoMapper {
                 .build();
     }
 
+    public UserMemberProfileResponseDTO toUpdate(User user,UpdateMemberProfileDTO dto, LoyaltyTier tier) {
+        return UserMemberProfileResponseDTO.builder()
+                .id(user.getId())
+                .name(dto.getName())
+                .email(user.getEmail())
+                .phoneNumber(dto.getPhoneNumber())
+                .userType(user.getUserType())
+                .updatedAt(user.getUpdatedAt())
+                .createdAt(user.getCreatedAt())
+                .appointments(user.getAppointments()
+                        .stream()
+                        .map(appointmentDtoMapper::toDTO)
+                        .collect(Collectors.toList()))
+                .loyaltyRecord(loyaltyRecordDtoMapper.toDTO(user.getLoyaltyRecord()))
+                .loyaltyTier(tier)
+                .build();
+    }
+
     public UserDashboardDTO toDashboardDTO(User user, LoyaltyTier tier, AppointmentSummaryDTO aptDTO) {
         return UserDashboardDTO.builder()
                 .userId(user.getId())
@@ -81,6 +102,19 @@ public class UserMemberDtoMapper {
                 .loyaltyTier(tier)
                 .appointmentCount(user.getAppointments().size())
                 .nextApt(aptDTO)
+                .build();
+    }
+
+    public CurrentUserDTO toCurrentUserDTO(User user, LoyaltyTier tier ) {
+        return CurrentUserDTO.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phoneNumber(user.getPhoneNumber())
+                .memberStatus(user.getUserType())
+                .loyaltyPoints(user.getLoyaltyRecord().getPoints())
+                .redeemedPoints(user.getLoyaltyRecord().getRedeemedPoints())
+                .loyaltyTier(tier)
                 .build();
     }
 }

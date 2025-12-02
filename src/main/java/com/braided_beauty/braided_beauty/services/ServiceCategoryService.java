@@ -107,6 +107,13 @@ public class ServiceCategoryService {
                 .map(mapper::toDto);
     }
 
+    public List<ServiceCategoryResponseDTO> getAllCategoriesByList() {
+        return repo.findAll()
+                .stream()
+                .map(mapper::toDto)
+                .toList();
+    }
+
     @Transactional
     public void delete(UUID id) {
         if (id == null) {

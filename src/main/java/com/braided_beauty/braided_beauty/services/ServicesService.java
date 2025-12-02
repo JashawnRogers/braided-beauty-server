@@ -105,6 +105,13 @@ public class ServicesService {
                 .map(serviceDtoMapper::toDto);
     }
 
+    public List<ServiceResponseDTO> getAllServicesByList() {
+        return serviceRepository.findAll()
+                .stream()
+                .map(serviceDtoMapper::toDto)
+                .toList();
+    }
+
     public ServiceResponseDTO getServiceById(UUID serviceId){
         ServiceModel service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));

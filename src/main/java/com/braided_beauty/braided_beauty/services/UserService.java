@@ -4,6 +4,8 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.*;
+import com.braided_beauty.braided_beauty.dtos.user.global.CurrentUserDTO;
+import com.braided_beauty.braided_beauty.dtos.user.member.UpdateMemberProfileDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
@@ -170,13 +172,28 @@ public class UserService {
     }
 
     @Transactional // <-- Allows JPA to push pending changes to DB
-    public UserMemberProfileResponseDTO updateMemberData(UserMemberRequestDTO dto) {
-        User user = userRepository.findById(dto.getId())
+    public UserMemberProfileResponseDTO updateMemberDataByAdmin(UUID id,UserMemberRequestDTO dto) {
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User does not exist"));
         userRepository.save(UserMemberDtoMapper.toEntity(user, dto));
         LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
         // Saving is not needed due to JPA managing the entity at transaction commit
         return userMemberDtoMapper.toDTO(user, tier);
+    }
+
+    @Transactional
+    public UserMemberProfileResponseDTO updateMemberDataByMember(UUID id, UpdateMemberProfileDTO dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + id));
+
+        user.setName(dto.getName());
+        user.setPhoneNumber(dto.getPhoneNumber());
+        user.setUpdatedAt(LocalDateTime.now());
+
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
+
+        userRepository.save(user);
+        return userMemberDtoMapper.toUpdate(user, dto, tier);
     }
 
     public UserDashboardDTO getDashboard(UUID userId) {
@@ -192,5 +209,14 @@ public class UserService {
 
     public User findUserByEmailOrThrow(String email) {
         return userRepository.findUserByEmail(email).orElseThrow(() -> new NotFoundException("No user found with email: " + email));
+    }
+
+    public CurrentUserDTO getCurrentUser(UUID id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("No user found with ID: " + id));
+
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
+
+        return userMemberDtoMapper.toCurrentUserDTO(user, tier);
     }
 }

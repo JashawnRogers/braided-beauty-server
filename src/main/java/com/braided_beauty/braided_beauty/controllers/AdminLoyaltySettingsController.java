@@ -5,19 +5,22 @@ import com.braided_beauty.braided_beauty.services.LoyaltyService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/loyalty/settings")
+@RequestMapping("/api/v1/admin/loyalty/settings")
 @AllArgsConstructor
-public class LoyaltySettingsController {
+public class AdminLoyaltySettingsController {
     private final LoyaltyService service;
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<LoyaltySettingsDTO> getSettings() {
         return ResponseEntity.ok(service.getSettings());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping
     public ResponseEntity<LoyaltySettingsDTO> updateSettings(
             @Valid @RequestBody LoyaltySettingsDTO dto) {

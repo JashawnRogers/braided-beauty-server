@@ -41,20 +41,6 @@ public class AuthController {
     private static final String COOKIE_NAME = "refreshToken";
     private static final Duration COOKIE_TTL = Duration.ofDays(14);
 
-
-    @Operation(
-            summary = "Login with email and password",
-            description = "Authenticates user and returns a new JWT access token and sets a refresh token as an HTTP-only cookie.",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Login credentials",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = LoginRequestDTO.class))
-            )
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Login successful. Access token returned."),
-            @ApiResponse(responseCode = "401", description = "Invalid email or password", content = @Content)
-    })
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequestDTO dto, HttpServletResponse res) {
         Authentication auth = authenticationManager.authenticate(
@@ -67,27 +53,14 @@ public class AuthController {
         String email = user.getEmail();
         String name = user.getName();
 
-        String accesToken = jwtService.generateAccessToken(userId, email, name, auth.getAuthorities());
+        String accessToken = jwtService.generateAccessToken(userId, email, name, auth.getAuthorities());
 
         var issued = refreshTokenService.issueForUser(userId, "web");
         addRefreshCookie(res, issued.getRefreshToken());
 
-        return ResponseEntity.ok(Map.of("accessToken", accesToken));
+        return ResponseEntity.ok(Map.of("accessToken", accessToken));
     }
 
-    @Operation(
-            summary = "Register a new user",
-            description = "Registers a new user and immediately returns access and refresh tokens.",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    description = "Registration form data",
-                    content = @Content(schema = @Schema(implementation = UserRegistrationDTO.class))
-            )
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "User successfully registered"),
-            @ApiResponse(responseCode = "400", description = "Validation error or duplicate email", content = @Content)
-    })
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody UserRegistrationDTO dto, HttpServletResponse res) {
         User user = authService.register(dto);
@@ -109,14 +82,6 @@ public class AuthController {
     }
 
 
-    @Operation(
-            summary = "Refresh access token",
-            description = "Rotates the refresh token and returns a new access token. Refresh token is expected in the HTTP-only cookie."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Access token refreshed"),
-            @ApiResponse(responseCode = "401", description = "Missing or invalid refresh token", content = @Content)
-    })
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue(value = COOKIE_NAME, required = false) String cookieToken,
                                      HttpServletResponse res) {
@@ -129,14 +94,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("accessToken", rotatedToken.getNewAccessToken()));
     }
 
-    @Operation(
-            summary = "Logout user",
-            description = "Revokes the refresh token and clears the HTTP-only refresh cookie."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Logout successful"),
-            @ApiResponse(responseCode = "200", description = "No refresh token found — no action taken")
-    })
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@CookieValue(value = COOKIE_NAME, required = false) String cookieToken,
                                        HttpServletResponse res) {

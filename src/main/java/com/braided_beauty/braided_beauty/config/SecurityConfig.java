@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.config;
 
+import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.AuthService;
 import com.braided_beauty.braided_beauty.services.JwtService;
@@ -44,8 +45,8 @@ public class SecurityConfig {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
         //Read from "roles" instead of "scope"
-        authoritiesConverter.setAuthoritiesClaimName("role");
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
+        authoritiesConverter.setAuthoritiesClaimName("roles");
+        authoritiesConverter.setAuthorityPrefix("");
 
         return jwt -> {
             var authorities = authoritiesConverter.convert(jwt);
@@ -106,10 +107,11 @@ public class SecurityConfig {
                                 "/api/v1/appointments/**",
                                 "/api/v1/appointments/book",
                                 "/api/v1/appointments/cancel",
-                                "/api/v1/user/profile/**",
+                                "/api/v1/user/user/**",
                                 "/api/v1/user/appointments",
                                 "/api/v1/user/loyalty-points"
                                 ).authenticated()
+                                .requestMatchers("/api/v1/admin/**").authenticated()
 
                                 // All other routes are protected
                                 .anyRequest().authenticated()

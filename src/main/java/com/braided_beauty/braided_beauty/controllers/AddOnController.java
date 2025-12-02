@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -21,35 +22,12 @@ public class AddOnController {
     private final AddOnService addOnService;
 
     @GetMapping
-    public ResponseEntity<Page<AddOnResponseDTO>> getAllAddOns(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAtTo,
-            Pageable pageable
-    ){
-        try {
-            Page<AddOnResponseDTO> page = addOnService.getAllAddOns(search, createdAtFrom,createdAtTo, pageable);
-            return ResponseEntity.ok(page);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
+    public ResponseEntity<List<AddOnResponseDTO>> getAllAddOnsByList() {
+        return ResponseEntity.ok(addOnService.getAllAddOnsByList());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<AddOnResponseDTO> getAddOn(@PathVariable UUID id) {
         return ResponseEntity.ok(addOnService.getAddOn(id));
     }
-
-    @PostMapping
-    public ResponseEntity<AddOnResponseDTO> create(@Valid @RequestBody AddOnRequestDTO dto) {
-        return ResponseEntity.ok(addOnService.save(dto));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<AddOnResponseDTO> update(@Valid @RequestBody AddOnRequestDTO dto, @PathVariable UUID id) {
-        dto.setId(id); // Trust path param as the source of truth
-        return ResponseEntity.ok(addOnService.save(dto));
-    }
-
 }

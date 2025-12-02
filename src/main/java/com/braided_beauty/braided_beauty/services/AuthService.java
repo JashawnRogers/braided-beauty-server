@@ -77,7 +77,7 @@ public class AuthService {
         // Build authorities and principal
         Set<String> roleStrings = UserType.roleStringsFor(user.getUserType());
         var authorities = roleStrings.stream()
-                .map(SimpleGrantedAuthority::new)
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                 .toList();
 
         var principal = new AppUserPrincipal(
