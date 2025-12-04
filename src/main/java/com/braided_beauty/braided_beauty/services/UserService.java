@@ -51,13 +51,13 @@ public class UserService {
     private final UserAdminMapper userAdminMapper;
     private final LoyaltyService loyaltyService;
 
-    public UserMemberProfileResponseDTO getMemberProfile(UUID userId) {
+    public CurrentUserDTO getMemberProfile(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User does not exist."));
 
         LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
 
-        return userMemberDtoMapper.toDTO(user, tier);
+        return userMemberDtoMapper.toCurrentUserDTO(user, tier);
     }
 
     public List<AppointmentResponseDTO> getAppointmentHistory(UUID userId){
@@ -182,7 +182,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserMemberProfileResponseDTO updateMemberDataByMember(UUID id, UpdateMemberProfileDTO dto) {
+    public CurrentUserDTO updateMemberDataByMember(UUID id, UpdateMemberProfileDTO dto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found with ID: " + id));
 
@@ -193,7 +193,7 @@ public class UserService {
         LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
 
         userRepository.save(user);
-        return userMemberDtoMapper.toUpdate(user, dto, tier);
+        return userMemberDtoMapper.toCurrentUserDTO(user, tier);
     }
 
     public UserDashboardDTO getDashboard(UUID userId) {

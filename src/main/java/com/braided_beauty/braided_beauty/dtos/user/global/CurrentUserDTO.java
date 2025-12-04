@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Builder
@@ -20,4 +21,6 @@ public class CurrentUserDTO {
     private Integer loyaltyPoints;
     private Integer redeemedPoints;
     private LoyaltyTier loyaltyTier;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

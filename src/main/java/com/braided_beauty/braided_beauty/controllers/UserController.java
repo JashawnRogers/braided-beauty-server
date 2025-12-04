@@ -38,14 +38,14 @@ public class UserController {
                 .id()));
     }
 
-    @PutMapping("/me/profile")
-    public ResponseEntity<UserMemberProfileResponseDTO> updateMemberDataByMember(
+    @PatchMapping("/me/profile")
+    public ResponseEntity<CurrentUserDTO> updateMemberDataByMember(
             @AuthenticationPrincipal AppUserPrincipal principal, @RequestBody UpdateMemberProfileDTO dto) {
         return ResponseEntity.status(HttpStatus.OK).body(userService.updateMemberDataByMember(principal.id(), dto));
     }
 
     @GetMapping("/me/profile")
-    public ResponseEntity<UserMemberProfileResponseDTO> getUserProfile(@AuthenticationPrincipal AppUserPrincipal principal){
+    public ResponseEntity<CurrentUserDTO> getUserProfile(@AuthenticationPrincipal AppUserPrincipal principal){
         return ResponseEntity.ok(userService.getMemberProfile(principal.id()));
     }
 
