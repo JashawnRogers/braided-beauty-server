@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
+import com.braided_beauty.braided_beauty.dtos.user.global.ChangePasswordRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
@@ -51,11 +52,25 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(UUID id, String newPassword){
+    public void updatePassword(UUID id, ChangePasswordRequestDTO dto){
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found with provided ID: " + id));
 
-        user.setPassword(passwordEncoder.encode(newPassword));
+        if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        if (!dto.getNewPassword().equals(dto.getConfirmNewPassword())) {
+            throw new IllegalArgumentException("New password and confirmation do not match");
+        }
+
+        if (passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("New password must be different from the current password");
+        }
+
+        validatePassword(dto.getNewPassword(), user);
+
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userRepository.save(user);
     }
 
@@ -106,5 +121,25 @@ public class AuthService {
         }
 
         return Map.of("email", oauthAuth.getName());
+    }
+
+    private void validatePassword(String password, User user) {
+        if (password.length() < 8) {
+            throw new IllegalArgumentException("Password must be equal to or more than 8 characters");
+        }
+
+        String lower = password.toLowerCase();
+
+        if (user.getName() != null && lower.contains(user.getName().toLowerCase())) {
+            throw new IllegalArgumentException("Password must not include your name");
+        }
+
+        if (user.getEmail() != null && lower.contains(user.getEmail().toLowerCase())) {
+            throw new IllegalArgumentException("Password must not include email");
+        }
+
+        if (user.getPhoneNumber() != null && password.contains(user.getPhoneNumber())) {
+            throw new IllegalArgumentException("Password must not include phone number");
+        }
     }
 }

@@ -2,7 +2,9 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.user.auth.LoginRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
+import com.braided_beauty.braided_beauty.dtos.user.global.ChangePasswordRequestDTO;
 import com.braided_beauty.braided_beauty.models.User;
+import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.AuthService;
 import com.braided_beauty.braided_beauty.services.JwtService;
 import com.braided_beauty.braided_beauty.services.RefreshTokenService;
@@ -16,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -98,6 +101,12 @@ public class AuthController {
         }
 
         clearRefreshCookie(res);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/change-password")
+    public ResponseEntity<Void> updatePassword(@AuthenticationPrincipal AppUserPrincipal principal, @RequestBody ChangePasswordRequestDTO dto) {
+        authService.updatePassword(principal.id(), dto);
         return ResponseEntity.noContent().build();
     }
 
