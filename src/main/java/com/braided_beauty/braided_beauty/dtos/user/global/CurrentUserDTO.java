@@ -21,6 +21,9 @@ public class CurrentUserDTO {
     private Integer loyaltyPoints;
     private Integer redeemedPoints;
     private LoyaltyTier loyaltyTier;
+    private String oAuthSubject;
+    private String oAuthProvider;
+    private Boolean isOAuthAccount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

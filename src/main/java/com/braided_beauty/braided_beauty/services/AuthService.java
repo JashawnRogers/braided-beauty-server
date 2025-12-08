@@ -55,12 +55,15 @@ public class AuthService {
     public User registerFromOauth(Map<String, Object> attributes){
         String email = (String) attributes.get("email");
         String name = (String) attributes.getOrDefault("name", email);
-        String providerId = (String) attributes.getOrDefault("sub", null);
+        String subject = (String) attributes.getOrDefault("sub", null);
+        String provider = "google";
 
         User user = new User();
         user.setName(name);
         user.setEmail(email);
         user.setUserType(UserType.MEMBER);
+        user.setOAuthSubject(subject);
+        user.setOAuthProvider(provider);
 
         LoyaltyRecord loyaltyRecord = new LoyaltyRecord();
         loyaltyRecord.setEnabled(true);
