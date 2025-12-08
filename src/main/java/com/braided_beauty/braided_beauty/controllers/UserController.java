@@ -5,7 +5,6 @@ import com.braided_beauty.braided_beauty.dtos.loyaltyRecord.LoyaltyRecordRespons
 import com.braided_beauty.braided_beauty.dtos.user.global.CurrentUserDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UpdateMemberProfileDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
-import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;

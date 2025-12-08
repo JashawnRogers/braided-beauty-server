@@ -51,6 +51,29 @@ public class AuthService {
         return userRepository.save(newUser);
     }
 
+    // Creates account in local db for first time OAuth login
+    public User registerFromOauth(Map<String, Object> attributes){
+        String email = (String) attributes.get("email");
+        String name = (String) attributes.getOrDefault("name", email);
+        String providerId = (String) attributes.getOrDefault("sub", null);
+
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setUserType(UserType.MEMBER);
+
+        LoyaltyRecord loyaltyRecord = new LoyaltyRecord();
+        loyaltyRecord.setEnabled(true);
+        loyaltyRecord.setPoints(0);
+        loyaltyRecord.setRedeemedPoints(0);
+        loyaltyRecord.setSignupBonusAwarded(false);
+
+        loyaltyRecord.setUser(user);
+        user.setLoyaltyRecord(loyaltyRecord);
+
+        return userRepository.save(user);
+    }
+
     @Transactional
     public void updatePassword(UUID id, ChangePasswordRequestDTO dto){
         User user = userRepository.findById(id)
@@ -87,7 +110,7 @@ public class AuthService {
 
         // Find user or create new if not in db
         User user = userRepository.findUserByEmail(email)
-                .orElseGet(() -> userService.registerFromOauth(attributes));
+                .orElseGet(() -> registerFromOauth(attributes));
 
         // Build authorities and principal
         Set<String> roleStrings = UserType.roleStringsFor(user.getUserType());
