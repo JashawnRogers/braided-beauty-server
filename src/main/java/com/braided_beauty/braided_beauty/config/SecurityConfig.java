@@ -97,6 +97,7 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/api/v1/service",
                                 "/api/v1/service/**",
+                                "/api/v1/category",
                                 "/api/v1/auth/**",
                                 "/error"
 

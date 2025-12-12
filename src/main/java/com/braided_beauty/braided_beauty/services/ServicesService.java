@@ -17,10 +17,8 @@ import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -117,5 +115,12 @@ public class ServicesService {
                 .orElseThrow(() -> new NotFoundException("Service not found."));
         log.info("Retrieved service with ID: {}", serviceId);
         return serviceDtoMapper.toDto(service);
+    }
+    public List<ServiceResponseDTO> getAllServicesByCategory(UUID categoryId) {
+       return serviceRepository.findAllByCategoryId(categoryId)
+                .orElseThrow(() -> new NotFoundException("No services found under this category"))
+                .stream()
+                .map(serviceDtoMapper::toDto)
+                .toList();
     }
 }

@@ -38,13 +38,19 @@ public class AdminServiceCategoryController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{id}")
+    public ResponseEntity<ServiceCategoryResponseDTO> getCategory(@PathVariable UUID id) {
+        return ResponseEntity.ok(service.getCategory(id));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<ServiceCategoryResponseDTO> create(@Valid @RequestBody ServiceCategoryCreateDTO dto) {
         return ResponseEntity.ok(service.create(dto));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<ServiceCategoryResponseDTO> update(@Valid @RequestBody ServiceCategoryUpdateDTO dto, @PathVariable UUID id) {
         return ResponseEntity.ok(service.update(dto, id));
     }

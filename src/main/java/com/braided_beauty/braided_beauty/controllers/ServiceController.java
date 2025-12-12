@@ -22,9 +22,14 @@ public class ServiceController {
     }
 
     @GetMapping("/{serviceId}")
-    public ResponseEntity<ServiceResponseDTO> getServiceById(
-            @Parameter(description = "UUID of the service to retrieve", required = true)
-            @PathVariable UUID serviceId){
+    public ResponseEntity<ServiceResponseDTO> getServiceById(@PathVariable UUID serviceId){
         return ResponseEntity.ok(service.getServiceById(serviceId));
+    }
+
+    @GetMapping("/category/{categoryId}")
+    public ResponseEntity<List<ServiceResponseDTO>> getAllServicesByCategory(
+            @PathVariable UUID categoryId
+    ) {
+        return ResponseEntity.ok(service.getAllServicesByCategory(categoryId));
     }
 }

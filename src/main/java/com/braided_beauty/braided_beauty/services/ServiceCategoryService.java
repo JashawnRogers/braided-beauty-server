@@ -39,6 +39,8 @@ public class ServiceCategoryService {
     @Transactional
     public ServiceCategoryResponseDTO create(ServiceCategoryCreateDTO dto) {
         String normalized = normalize(dto.getName());
+        dto.setName(normalized);
+
         if (normalized == null || normalized.isBlank()) {
             throw new IllegalArgumentException("Cannot create category without name");
         }
@@ -47,7 +49,7 @@ public class ServiceCategoryService {
         }
 
         try {
-            ServiceCategory saved = mapper.create(normalized);
+            ServiceCategory saved = mapper.create(dto);
             repo.save(saved);
             return mapper.toDto(saved);
         } catch (DataIntegrityViolationException ex) {
@@ -61,6 +63,7 @@ public class ServiceCategoryService {
     @Transactional
     public ServiceCategoryResponseDTO update(ServiceCategoryUpdateDTO dto, UUID targetId) {
         String normalized = normalize(dto.getName());
+        dto.setName(normalized);
         if (normalized == null || normalized.isBlank()) {
             throw new IllegalArgumentException("Cannot update category without name");
         }
@@ -78,7 +81,7 @@ public class ServiceCategoryService {
         }
 
         try {
-            return mapper.toDto(repo.save(mapper.update(target, normalize(dto.getName()))));
+            return mapper.toDto(repo.save(mapper.update(target, dto)));
         } catch (DataIntegrityViolationException | ConstraintViolationException ex) {
             if (isUniqueViolation(ex)) {
                 throw new DuplicateEntityException("Category '" + normalized + "' already exists");

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,4 +22,5 @@ public interface ServiceRepository extends JpaRepository<ServiceModel, UUID>, Jp
     @EntityGraph(attributePaths = {"category", "addOns"})
     @Nonnull
     Page<ServiceModel> findAll(@Nullable Specification<ServiceModel> spec, @Nonnull Pageable pageable);
+    Optional<List<ServiceModel>> findAllByCategoryId(UUID categoryId);
 }
