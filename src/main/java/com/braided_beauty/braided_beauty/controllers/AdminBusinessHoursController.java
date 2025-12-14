@@ -26,13 +26,19 @@ public class AdminBusinessHoursController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{id}")
+    public ResponseEntity<BusinessHoursResponseDTO> getOne( @PathVariable UUID id) {
+        return ResponseEntity.ok(service.getOne(id));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<BusinessHoursResponseDTO> create(@Valid @RequestBody BusinessHoursRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<BusinessHoursResponseDTO> update(@Valid @RequestBody BusinessHoursRequestDTO dto,
                                                            @PathVariable UUID id) {
         return ResponseEntity.ok(service.update(id, dto));

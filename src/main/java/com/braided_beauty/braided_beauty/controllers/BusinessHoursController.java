@@ -22,7 +22,7 @@ public class BusinessHoursController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BusinessHoursResponseDTO> get(@PathVariable UUID id) {
-        return ResponseEntity.ok(service.get(id));
+        return ResponseEntity.ok(service.getOne(id));
     }
 
 }

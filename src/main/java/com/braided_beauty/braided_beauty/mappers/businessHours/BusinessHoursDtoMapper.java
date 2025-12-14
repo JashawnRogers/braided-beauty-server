@@ -24,13 +24,13 @@ public class BusinessHoursDtoMapper {
         target.setClosed(dto.isClosed());
     }
 
-    public BusinessHoursResponseDTO toDTO(BusinessHours dto){
+    public BusinessHoursResponseDTO toDTO(BusinessHours entity){
         return BusinessHoursResponseDTO.builder()
-                .id(dto.getId())
-                .dayOfWeek(dto.getDayOfWeek())
-                .openTime(dto.getOpenTime())
-                .closeTime(dto.getCloseTime())
-                .isClosed(dto.isClosed())
+                .id(entity.getId())
+                .dayOfWeek(entity.getDayOfWeek())
+                .openTime(entity.getOpenTime())
+                .closeTime(entity.getCloseTime())
+                .isClosed(entity.isClosed())
                 .build();
     }
 }

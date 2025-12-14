@@ -69,7 +69,7 @@ public class BusinessHoursService {
         repo.deleteById(id);
     }
 
-    public BusinessHoursResponseDTO get(UUID id) {
+    public BusinessHoursResponseDTO getOne(UUID id) {
         BusinessHours entity = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("Business hours not found: " + id));
         log.info("Returning business hours entity, ID: {}", id);
