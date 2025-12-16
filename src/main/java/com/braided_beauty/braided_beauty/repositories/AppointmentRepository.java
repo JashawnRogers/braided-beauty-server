@@ -41,4 +41,5 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
             Collection<AppointmentStatus> statuses,
             Pageable pageable
     );
+    List<Appointment> findByServiceIdAndAppointmentTimeBetween(UUID serviceId, LocalDateTime startTime, LocalDateTime closeTime);
 }
