@@ -1,12 +1,15 @@
 package com.braided_beauty.braided_beauty.mappers.service;
 
+import com.braided_beauty.braided_beauty.dtos.addOn.AddOnResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.service.PopularServiceDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceCreateDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
+import com.braided_beauty.braided_beauty.mappers.addOn.AddOnDTOMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import jakarta.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -16,7 +19,9 @@ import java.util.*;
 import static com.braided_beauty.braided_beauty.utils.Deposit.getDepositAmount;
 
 @Component
+@RequiredArgsConstructor
 public class ServiceDtoMapper {
+    private final AddOnDTOMapper addOnDTOMapper;
 
     private static List<String> normalizeKeys(@Nullable List<String> src) {
         if (src == null || src.isEmpty()) return List.of();
@@ -52,6 +57,7 @@ public class ServiceDtoMapper {
     }
 
     public ServiceResponseDTO toDto(ServiceModel service){
+        List<AddOnResponseDTO> addOns = service.getAddOns().stream().map(addOnDTOMapper::toDto).toList();
         return ServiceResponseDTO.builder()
                 .id(service.getId())
                 .categoryName(service.getCategory().getName())
@@ -65,8 +71,7 @@ public class ServiceDtoMapper {
                 .videoKey(service.getVideoKey())
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
-                .addOnIds(service.getAddOns().stream().map(AddOn::getId).toList())
-                .addOnNames(service.getAddOns().stream().map(AddOn::getName).toList())
+                .addOns(addOns)
                 .build();
     }
 

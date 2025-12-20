@@ -16,9 +16,11 @@ import java.util.UUID;
 @Setter
 public class AddOnRequestDTO {
     private UUID id;
-    @NotBlank(message = "must provide a name for the add on.")
+    @NotBlank(message = "must provide a name for the add on")
     private String name;
-    @PositiveOrZero(message = "price must be zero or more.")
+    @PositiveOrZero(message = "price must be zero or more")
     private BigDecimal price;
+    @PositiveOrZero(message = "Duration must be zero or more")
+    private Integer durationMinutes;
     private String description;
 }

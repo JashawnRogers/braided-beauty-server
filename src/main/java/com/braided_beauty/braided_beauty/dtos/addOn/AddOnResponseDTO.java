@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.addOn;
 
+import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +19,7 @@ public class AddOnResponseDTO {
     private final UUID id;
     private final String name;
     private final BigDecimal price;
-    private final List<Appointment> appointments;
+    private final List<AppointmentSummaryDTO> appointments;
     private final String description;
+    private final Integer durationMinutes;
 }

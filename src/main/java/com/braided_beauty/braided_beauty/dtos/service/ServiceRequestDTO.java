@@ -40,7 +40,7 @@ public class ServiceRequestDTO {
     @Min(value = -1, message = "Duration of service must not be a negative number.")
     private Integer durationMinutes;
     @Nullable
-    private List<UUID> addOnIds = List.of();
+    private List<UUID> addOnIds;
 
     // Media state deltas:
     // If null -> leave unchanged - If present -> apply changes

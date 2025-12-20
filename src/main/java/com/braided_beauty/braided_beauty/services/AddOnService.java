@@ -39,6 +39,31 @@ public class AddOnService {
 
     }
 
+    @Transactional
+    public AddOnResponseDTO update(AddOnRequestDTO dto){
+        AddOn addOn = addOnRepository.findById(dto.getId())
+                .orElseThrow(() -> new NotFoundException("No add on found with ID: " + dto.getId()));
+
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            addOn.setName(dto.getName());
+        }
+
+        if (dto.getPrice() != null) {
+            addOn.setPrice(dto.getPrice());
+        }
+
+        if (dto.getDurationMinutes() != null) {
+            addOn.setDurationMinutes(dto.getDurationMinutes());
+        }
+
+        if (!dto.getDescription().isBlank()) {
+            addOn.setDescription(dto.getDescription());
+        }
+
+        addOnRepository.save(addOn);
+        return addOnDTOMapper.toDto(addOn);
+    }
+
     public Page<AddOnResponseDTO> getAllAddOns(
             String search,
             LocalDateTime createdAtFrom,

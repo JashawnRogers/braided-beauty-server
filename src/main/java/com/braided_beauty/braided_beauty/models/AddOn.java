@@ -43,4 +43,7 @@ public class AddOn {
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
 }

@@ -1,6 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.service;
 
-import com.braided_beauty.braided_beauty.models.ServiceCategory;
+import com.braided_beauty.braided_beauty.dtos.addOn.AddOnResponseDTO;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -26,6 +26,6 @@ public class ServiceResponseDTO {
     private String videoKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<UUID> addOnIds;
-    private List<String> addOnNames;
+    private List<AddOnResponseDTO> addOns;
+
 }

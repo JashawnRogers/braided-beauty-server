@@ -2,9 +2,11 @@ package com.braided_beauty.braided_beauty.mappers.addOn;
 
 import com.braided_beauty.braided_beauty.dtos.addOn.AddOnRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.addOn.AddOnResponseDTO;
+import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,7 +15,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Component
-@AllArgsConstructor
 public class AddOnDTOMapper {
 
     public AddOn create(AddOnRequestDTO dto){
@@ -34,21 +35,18 @@ public class AddOnDTOMapper {
         if (!Objects.equals(dto.getDescription(), target.getDescription())) {
             target.setDescription(dto.getDescription());
         }
+        if (dto.getDurationMinutes() != null) target.setDurationMinutes(dto.getDurationMinutes());
 
         return target;
     }
 
     public AddOnResponseDTO toDto(AddOn addOn){
-        List<Appointment> appointments = new ArrayList<>();
         return AddOnResponseDTO.builder()
                 .id(addOn.getId())
                 .name(addOn.getName())
                 .price(addOn.getPrice())
                 .description(addOn.getDescription())
-                .appointments(
-                        addOn.getAppointments() == null || addOn.getAppointments().isEmpty() ?
-                                appointments : addOn.getAppointments()
-                )
+                .durationMinutes(addOn.getDurationMinutes())
                 .build();
     }
 }

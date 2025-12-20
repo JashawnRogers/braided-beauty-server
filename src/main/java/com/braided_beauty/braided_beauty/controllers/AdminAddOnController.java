@@ -52,9 +52,8 @@ public class AdminAddOnController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<AddOnResponseDTO> update(@Valid @RequestBody AddOnRequestDTO dto, @PathVariable UUID id) {
-        dto.setId(id); // Trust path param as the source of truth
-        return ResponseEntity.ok(addOnService.save(dto));
+        return ResponseEntity.ok(addOnService.update(dto));
     }
 }
