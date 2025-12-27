@@ -250,7 +250,11 @@ public class AppointmentService {
     public Optional<AppointmentSummaryDTO> getNextAppointment(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
 
-        return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, AppointmentStatus.CONFIRMED)
+        List<AppointmentStatus> statuses = List.of(
+                AppointmentStatus.COMPLETED
+        );
+
+        return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, statuses)
                 .map(appointmentDtoMapper::toSummaryDTO);
     }
 
