@@ -1,13 +1,20 @@
 package com.braided_beauty.braided_beauty.mappers.appointment;
 
+import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @AllArgsConstructor
@@ -23,19 +30,25 @@ public class AppointmentDtoMapper {
     }
 
     public AppointmentResponseDTO toDTO(Appointment appointment){
+        var service = serviceDtoMapper.toDto(appointment.getService());
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        String guestCancelToken = appointment.getUser() == null ? appointment.getGuestCancelToken() : null;
+
         return AppointmentResponseDTO.builder()
                 .id(appointment.getId())
                 .appointmentTime(appointment.getAppointmentTime())
                 .appointmentStatus(appointment.getAppointmentStatus())
                 .createdAt(appointment.getCreatedAt())
-                .service(serviceDtoMapper.toDto(appointment.getService()))
+                .service(service)
                 .depositAmount(appointment.getDepositAmount())
                 .paymentStatus(appointment.getPaymentStatus())
                 .stripePaymentId(appointment.getStripePaymentId())
-                .pointsEarned(serviceDtoMapper.toDto(appointment.getService()).getPointsEarned())
+                .pointsEarned(service.getPointsEarned())
                 .updatedAt(appointment.getUpdatedAt())
                 .note(appointment.getNote())
                 .addOns(appointment.getAddOns())
+                .email(email)
+                .guestCancelToken(guestCancelToken)
                 .build();
     }
 
@@ -45,6 +58,44 @@ public class AppointmentDtoMapper {
                 .serviceName(appointment.getService().getName())
                 .appointmentTime(appointment.getAppointmentTime())
                 .appointmentStatus(appointment.getAppointmentStatus())
+                .build();
+    }
+
+    public AdminAppointmentSummaryDTO toAdminSummaryDTO(Appointment appointment) {
+        String serviceName = appointment.getService().getName();
+        BigDecimal deposit = Optional.ofNullable(appointment.getDepositAmount()).orElse(BigDecimal.ZERO);
+        BigDecimal tip = Optional.ofNullable(appointment.getTipAmount()).orElse(BigDecimal.ZERO);
+        BigDecimal servicePrice = Optional.ofNullable(appointment.getService().getPrice()).orElse(BigDecimal.ZERO);
+
+        BigDecimal totalPriceOfAddOns =
+                appointment.getAddOns().stream()
+                        .map(AddOn::getPrice)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal remainingBalance = servicePrice
+                        .add(totalPriceOfAddOns)
+                        .subtract(deposit);
+
+        BigDecimal totalAmount = servicePrice
+                .add(totalPriceOfAddOns)
+                .add(tip);
+
+        List<String> addOns = appointment.getAddOns()
+                .stream()
+                .map(AddOn::getName)
+                .toList();
+
+
+        return AdminAppointmentSummaryDTO.builder()
+                .appointmentId(appointment.getId())
+                .appointmentTime(appointment.getAppointmentTime())
+                .appointmentStatus(appointment.getAppointmentStatus())
+                .serviceName(serviceName)
+                .addOns(addOns)
+                .paymentStatus(appointment.getPaymentStatus())
+                .remainingBalance(remainingBalance)
+                .totalAmount(totalAmount)
                 .build();
     }
 }

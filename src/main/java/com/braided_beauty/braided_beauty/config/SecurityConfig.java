@@ -99,6 +99,7 @@ public class SecurityConfig {
                                 "/api/v1/service/**",
                                 "/api/v1/category",
                                 "/api/v1/availability",
+                                "/api/v1/appointments",
                                 "/api/v1/auth/**",
                                 "/error"
 

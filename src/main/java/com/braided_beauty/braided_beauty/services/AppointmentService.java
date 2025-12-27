@@ -14,10 +14,16 @@ import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMappe
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.models.User;
+import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
+import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
+import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
+import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,84 +31,145 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Payment lifecycle for an appointment.
+ * Notes:
+ * - PENDING: payment has been initiated (e.g., appointment created / checkout session created) but not yet confirmed by webhook.
+ * - PAID_DEPOSIT: deposit payment succeeded.
+ * - COMPLETED: paid-in-full (final payment succeeded).
+ * - FAILED: a payment attempt failed.
+ * - REFUNDED: refunded (full refund for the relevant payment scope).
+ * - NO_DEPOSIT_REQUIRED: deposit amount was 0; appointment can proceed without deposit.
+ */
 
 @Service
 @AllArgsConstructor
 public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final AppointmentDtoMapper appointmentDtoMapper;
+    private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
     private final AddOnService addOnService;
     private final PaymentService paymentService;
     private final SchedulingConfig schedulingConfig;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
+    private final FrontendProps frontendProps;
 
-    public AppointmentResponseDTO createAppointment(AppointmentRequestDTO appointmentRequestDTO) throws StripeException {
-        ServiceModel service = serviceRepository.findById(appointmentRequestDTO.getServiceId())
+    @Transactional
+    public CheckoutLinkResponse createAppointment(AppointmentRequestDTO dto, AppUserPrincipal principal) throws StripeException {
+        ServiceModel service = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
 
+        appointmentRepository.lockSchedule();
+
         int bufferMinutes = schedulingConfig.getBufferMinutes();
-        LocalDateTime start = appointmentRequestDTO.getAppointmentTime();
-        LocalDateTime end = start.plusMinutes(service.getDurationMinutes() + bufferMinutes);
-        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
-        if (!conflicts.isEmpty()){
-            throw new ConflictException("This time overlaps with another appointment.");
+        LocalDateTime start = dto.getAppointmentTime();
+
+        Appointment appointment = appointmentDtoMapper.toEntity(dto);
+
+        // ----- user vs guest -----
+        if (principal != null) {
+            User user = userRepository.findById(principal.id())
+                    .orElseThrow(() -> new NotFoundException("No user found with ID: " + principal.id()));
+            appointment.setUser(user);
+            appointment.setGuestEmail(null);
+        } else {
+            String email = dto.getReceiptEmail();
+            if (email == null || email.isBlank()) throw new IllegalArgumentException("Guest booking requires a receipt email");
+            appointment.setUser(null);
+            appointment.setGuestEmail(email);
+            appointment.setGuestCancelToken(UUID.randomUUID().toString());
         }
 
-        Appointment appointment = appointmentDtoMapper.toEntity(appointmentRequestDTO);
+        boolean hasUser = appointment.getUser() != null;
+        boolean hasGuestEmail = appointment.getGuestEmail() != null && !appointment.getGuestEmail().isBlank();
+        if (hasUser == hasGuestEmail) throw new IllegalStateException("Must have exactly one: user or guest email");
 
+        // ----- service + add-ons -----
         appointment.setService(service);
-        appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
-        appointment.setDepositAmount(service.getDepositAmount());
-        appointment.setPaymentStatus(PaymentStatus.PENDING);
 
-        if (appointmentRequestDTO.getAddOnIds() != null && !appointmentRequestDTO.getAddOnIds().isEmpty()) {
-            List<AddOn> addOns = addOnService.getAddOnIds(appointmentRequestDTO.getAddOnIds());
+        List<AddOn> addOns = List.of();
+        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
+            addOns = addOnService.getAddOnIds(dto.getAddOnIds());
             appointment.setAddOns(addOns);
+        } else {
+            appointment.setAddOns(List.of());
         }
 
-        // Save the appointment so it gets an ID (needed for Stripe metadata)
-        Appointment saved = appointmentRepository.save(appointment);
-        Session session = paymentService.createDepositCheckoutSession(saved, "", "");
+        int addOnMinutes = addOns.stream()
+                .map(AddOn::getDurationMinutes)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
 
-        // Save the Stripe session ID for future webhook/refund handling
+        BigDecimal addOnsTotal = addOns.stream()
+                .map(AddOn::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int durationMinutes = (service.getDurationMinutes() == null ? 0 : service.getDurationMinutes()) + addOnMinutes;
+
+        appointment.setDurationMinutes(durationMinutes);
+
+        // ----- conflict check uses duration + buffer -----
+        LocalDateTime end = start.plusMinutes(durationMinutes + bufferMinutes);
+
+        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
+        if (!conflicts.isEmpty()) throw new ConflictException("This time overlaps with another appointment.");
+
+        // ----- status/payment -----
+        BigDecimal total = addOnsTotal.add(appointment.getService().getPrice());
+        BigDecimal deposit = total.multiply(new BigDecimal("0.20"));
+
+        appointment.setDepositAmount(deposit);
+        if (appointment.getDepositAmount().compareTo(BigDecimal.ZERO) < 1) {
+            appointment.setAppointmentStatus(AppointmentStatus.PENDING_PAYMENT);
+            appointment.setPaymentStatus(PaymentStatus.PENDING);
+            appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
+        }
+        appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+        appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
+
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // ----- Call payment service after save -----
+        String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
+        Session session = paymentService.createDepositCheckoutSession(appointment, successUrl, cancelUrl);
+
         appointment.setStripeSessionId(session.getId());
         appointmentRepository.save(saved);
 
-        service.setTimesBooked(+1);
-        serviceRepository.save(service);
-
-        return appointmentDtoMapper.toDTO(saved);
+        return new CheckoutLinkResponse(session.getUrl(), appointment.getId());
     }
 
-    public AppointmentResponseDTO cancelAppointment(CancelAppointmentDTO dto) throws StripeException {
+    @Transactional
+    public AppointmentResponseDTO cancelAppointment(CancelAppointmentDTO dto) {
         UUID appointmentId = dto.getAppointmentId();
         UUID userId = dto.getUserId();
         String reason = dto.getCancelReason();
 
-        Appointment canceledAppointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("No appointment found."));
+        Appointment canceledAppointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new NotFoundException("No appointment found"));
 
-        ServiceModel service = canceledAppointment.getService();
+        if (canceledAppointment.getUser() == null) {
+            throw new UnauthorizedException("Guest appointments cannot be canceled via this endpoint");
+        }
 
-        if (!canceledAppointment.getUser().getId().equals(userId)){
-            throw new UnauthorizedException("You can't cancel someone else's appointment.");
+        if  (!canceledAppointment.getUser().getId().equals(userId)) {
+            throw new UnauthorizedException("You cannot cancel someone else's appointment");
         }
 
         if (canceledAppointment.getAppointmentStatus() == AppointmentStatus.CANCELED){
-            throw new ConflictException("Appointment already canceled.");
-        }
-
-        if (canceledAppointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT ||
-            canceledAppointment.getPaymentStatus() == PaymentStatus.COMPLETED) {
-            paymentService.updateRefundPayment(canceledAppointment);
-            canceledAppointment.setPaymentStatus(PaymentStatus.REFUNDED);
+            throw new ConflictException("Appointment already canceled");
         }
 
         canceledAppointment.setAppointmentStatus(AppointmentStatus.CANCELED);
@@ -111,20 +178,49 @@ public class AppointmentService {
 
         appointmentRepository.save(canceledAppointment);
 
-        service.setTimesBooked(-1);
-        serviceRepository.save(service);
-
         return appointmentDtoMapper.toDTO(canceledAppointment);
     }
 
-    public AppointmentResponseDTO completeAppointment(UUID appointmentId) throws StripeException{
-        Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found."));
+    @Transactional
+    public AppointmentResponseDTO cancelGuestAppointment(String token, String reason) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Missing cancel token");
+        }
 
-        appointment.setAppointmentStatus(AppointmentStatus.PAYMENT_IN_PROGRESS);
+        Appointment appointment = appointmentRepository.findByGuestCancelTokenForUpdate(token)
+                .orElseThrow(() -> new NotFoundException("No appointment found for this cancel token"));
+
+        if (appointment.getUser() != null) {
+            throw new UnauthorizedException("This cancel token is not valid for member appointments");
+        }
+
+        if (appointment.getAppointmentStatus() == AppointmentStatus.CANCELED) {
+            throw new ConflictException("Appointment already cancelled");
+        }
+
+        appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
+        appointment.setCancelReason(reason);
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        appointment.setGuestCancelToken(null);
+
+        appointmentRepository.save(appointment);
+        return appointmentDtoMapper.toDTO(appointment);
+    }
+
+    @Transactional
+    public AppointmentResponseDTO completeAppointment(UUID appointmentId) throws StripeException{
+
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
+
+        appointment.setAppointmentStatus(AppointmentStatus.PENDING_FINAL_PAYMENT);
         appointmentRepository.save(appointment);
 
-        Session session = paymentService.createFinalPaymentSession(appointment, "", "", appointment.getTipAmount());
+        String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
+
+        Session session = paymentService.createFinalPaymentSession(appointment, successUrl, cancelUrl, appointment.getTipAmount());
 
        appointment.setStripeSessionId(session.getId());
        appointmentRepository.save(appointment);
@@ -134,7 +230,7 @@ public class AppointmentService {
 
     public AppointmentResponseDTO getAppointmentById(UUID appointmentId){
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found."));
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
         log.info("Retrieved service with ID: {}", appointment.getId());
         return appointmentDtoMapper.toDTO(appointment);
     }
@@ -154,12 +250,7 @@ public class AppointmentService {
     public Optional<AppointmentSummaryDTO> getNextAppointment(UUID userId) {
         LocalDateTime now = LocalDateTime.now();
 
-        List<AppointmentStatus> statuses = List.of(
-                AppointmentStatus.BOOKED,
-                AppointmentStatus.CONFIRMED
-        );
-
-        return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, statuses)
+        return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, AppointmentStatus.CONFIRMED)
                 .map(appointmentDtoMapper::toSummaryDTO);
     }
 

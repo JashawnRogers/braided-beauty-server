@@ -47,21 +47,8 @@ public class StripeWebhookController {
 
     );
 
-    @Operation(
-            summary = "Stripe Webhook Endpoint",
-            description = "Handles incoming webhook events from Stripe such as checkout completion and payment failures.",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = String.class))
-            )
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Event received and processed"),
-            @ApiResponse(responseCode = "400", description = "Invalid signature or failed deserialization")
-    })
     @PostMapping
     public ResponseEntity<String> handleWebhook(@RequestBody String payload,
-                                                @Parameter(name = "Stripe-Signature", in = ParameterIn.HEADER, required = true, description = "Stripe signature header")
                                                 @RequestHeader("Stripe-Signature") String sigHeader) {
         Event event;
 

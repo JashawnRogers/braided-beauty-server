@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.Payment;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.lang.String;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -37,8 +39,12 @@ public class PaymentService {
 
     @Transactional
     public void updateRefundPayment(Appointment appointment) throws StripeException {
-        Payment payment = paymentRepository.findByAppointmentId(appointment.getId())
+        Payment payment = paymentRepository.findByAppointmentIdAndPaymentType(appointment.getId(), PaymentType.FINAL)
                 .orElseThrow(() -> new NotFoundException("No payment found for appointment."));
+
+        if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            throw new IllegalStateException("Refund already processed for appointment " + appointment.getId());
+        }
 
         RefundCreateParams refundParams = RefundCreateParams.builder()
                 .setPaymentIntent(payment.getStripePaymentIntentId())
@@ -56,12 +62,13 @@ public class PaymentService {
     @Transactional
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
         BigDecimal deposit = appointment.getDepositAmount();
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
-                .setCustomerEmail(appointment.getUser().getEmail())
+                .setCustomerEmail(email)
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
                                 .setQuantity(1L)
@@ -93,6 +100,7 @@ public class PaymentService {
                 .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(deposit)
                 .paymentStatus(PaymentStatus.PENDING)
+                .paymentType(PaymentType.DEPOSIT)
                 .appointment(appointment)
                 .user(appointment.getUser())
                 .build();
@@ -109,25 +117,34 @@ public class PaymentService {
             tipAmount = BigDecimal.ZERO;
         }
 
+        BigDecimal deposit = appointment.getDepositAmount() == null ? BigDecimal.ZERO : appointment.getDepositAmount();
         BigDecimal serviceAmount = appointment.getService().getPrice();
-        BigDecimal finalAmount = serviceAmount.add(tipAmount).subtract(appointment.getDepositAmount());
+        BigDecimal remainingBalance = serviceAmount.subtract(deposit);
+        BigDecimal finalAmount = remainingBalance.add(tipAmount);
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+
+        if (remainingBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Deposit exceeds service price for appointment " + appointment.getId());
+        }
 
         List<SessionCreateParams.LineItem> lineItems = Stream.of(
-                // Service amount line item
+                // Remaining balance line item
+                remainingBalance.compareTo(BigDecimal.ZERO) > 0 ?
                 SessionCreateParams.LineItem.builder()
                         .setQuantity(1L)
                         .setPriceData(
                                 SessionCreateParams.LineItem.PriceData.builder()
                                         .setCurrency("usd")
-                                        .setUnitAmount(serviceAmount.movePointRight(2).longValue())
+                                        .setUnitAmount(remainingBalance.movePointRight(2).longValueExact())
                                         .setProductData(
                                                 SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                        .setName("Service: " + appointment.getService().getName())
+                                                        .setName("Remaining balance: " + appointment.getService().getName())
                                                         .build()
                                         )
                                         .build()
                         )
-                        .build(),
+                        .build()
+                : null,
 
                 // Tip amount line item (optional)
                 tipAmount.compareTo(BigDecimal.ZERO) > 0 ?
@@ -136,7 +153,7 @@ public class PaymentService {
                                 .setPriceData(
                                         SessionCreateParams.LineItem.PriceData.builder()
                                                 .setCurrency("usd")
-                                                .setUnitAmount(tipAmount.movePointRight(2).longValue())
+                                                .setUnitAmount(tipAmount.movePointRight(2).longValueExact())
                                                 .setProductData(
                                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
                                                                 .setName("Tip")
@@ -151,7 +168,7 @@ public class PaymentService {
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
-                .setCustomerEmail(appointment.getUser().getEmail())
+                .setCustomerEmail(email)
                 .addAllLineItem(lineItems)
                 .setPaymentIntentData(
                     SessionCreateParams.PaymentIntentData.builder()
@@ -159,9 +176,15 @@ public class PaymentService {
                             .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
                             .putMetadata("tipAmount", tipAmount.toString())
                             .putMetadata("paymentType", "final")
+                            .putMetadata("remainingBalance", remainingBalance.toString())
+                            .putMetadata("finalAmount", finalAmount.toString())
                             .build()
                 )
                 .build();
+
+        if (lineItems.isEmpty()) {
+            throw new IllegalArgumentException("No amount due for appointment " + appointment.getId());
+        }
 
         Session session = Session.create(params);
 
@@ -171,6 +194,7 @@ public class PaymentService {
                 .amount(finalAmount)
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING)
+                .paymentType(PaymentType.FINAL)
                 .appointment(appointment)
                 .user(appointment.getUser())
                 .build();
@@ -197,7 +221,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntent.getId())
                 .orElseThrow(() -> new NotFoundException("Payment not found for appointment: " + appointmentIdString));
 
-        if ((payment.getPaymentStatus() == PaymentStatus.COMPLETED && "final".equals(paymentType)) ||
+        if ((payment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL && "final".equals(paymentType)) ||
                 (payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT && "deposit".equals(paymentType))
         ) {
             log.info("PaymentIntent {} already processed (status={})", paymentIntent.getId(), payment.getPaymentStatus());
@@ -210,15 +234,16 @@ public class PaymentService {
 
             appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
             appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+            appointment.setHoldExpiresAt(null);
             appointmentRepository.save(appointment);
 
             log.info("Deposit completed via paymentIntent {} for appointment {}", paymentIntent.getId(), appointmentIdString);
         } else if ("final".equals(paymentType)) {
-            payment.setPaymentStatus(PaymentStatus.COMPLETED);
+            payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
             paymentRepository.save(payment);
 
             appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-            appointment.setPaymentStatus(PaymentStatus.COMPLETED);
+            appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
             // award loyalty points with idempotent flag
             if (!appointment.isLoyaltyApplied()) {
                 loyaltyService.awardForCompletedAppointment(appointment.getUser());
@@ -247,6 +272,7 @@ public class PaymentService {
                 .ifPresent(appointment -> {
                     appointment.setAppointmentStatus(AppointmentStatus.PAYMENT_FAILED);
                     appointment.setPaymentStatus(PaymentStatus.FAILED);
+                    appointment.setHoldExpiresAt(null);
                     appointmentRepository.save(appointment);
                     log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, paymentIntent.getId());
                 });

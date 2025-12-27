@@ -5,14 +5,9 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.CancelAppointmentDTO;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
+import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.services.AppointmentService;
 import com.stripe.exception.StripeException;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,15 +29,19 @@ public class AppointmentController {
 
 
     @PostMapping("/book")
-    public ResponseEntity<AppointmentResponseDTO> createAppointment(
-            @Valid @RequestBody AppointmentRequestDTO dto) throws StripeException {
-        return ResponseEntity.ok(appointmentService.createAppointment(dto));
+    public ResponseEntity<CheckoutLinkResponse> createAppointment(
+            @Valid @RequestBody AppointmentRequestDTO dto, @AuthenticationPrincipal AppUserPrincipal principal) throws StripeException {
+        return ResponseEntity.ok(appointmentService.createAppointment(dto, principal));
+    }
+
+    @PostMapping("/guest/cancel")
+    public ResponseEntity<AppointmentResponseDTO> cancelGuestAppointment(@RequestParam("token") String token,
+                                                                         @RequestParam(value = "reason", required = false) String reason) {
+        return ResponseEntity.ok(appointmentService.cancelGuestAppointment(token, reason));
     }
 
     @PatchMapping("/cancel")
-    public ResponseEntity<AppointmentResponseDTO> cancelAppointment(
-            @Parameter(description = "DTO containing appointment ID and cancellation reason", required = true)
-            @Valid @RequestBody CancelAppointmentDTO dto) throws StripeException{
+    public ResponseEntity<AppointmentResponseDTO> cancelAppointment(@Valid @RequestBody CancelAppointmentDTO dto) throws StripeException{
         return ResponseEntity.ok(appointmentService.cancelAppointment(dto));
     }
 

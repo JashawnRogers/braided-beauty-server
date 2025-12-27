@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.models;
 
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,6 +28,11 @@ public class Payment {
     private BigDecimal tipAmount;
     @Column(name = "payment_status")
     private PaymentStatus paymentStatus;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_Type")
+    private PaymentType paymentType;
+    @Column(name = "refunded_amount")
+    private BigDecimal refundedAmount;
 
     @ManyToOne
     private Appointment appointment;

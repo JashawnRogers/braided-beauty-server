@@ -6,7 +6,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,7 +21,6 @@ public class AppointmentRequestDTO {
     @NotNull(message = "appointment must be linked to a service.")
     private final UUID serviceId;
     @Email
-    @NotNull(message = "Must provide email.")
     private final String receiptEmail;
     private final String note;
     private final String stripePaymentId;

@@ -12,6 +12,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,4 +33,8 @@ public class AppointmentResponseDTO {
     private final LocalDateTime updatedAt;
     private final List<AddOn> addOns;
     private final String note;
+    private final String email;
+
+    // Only populated for guest appointments. Null for member appointments
+    private final String guestCancelToken;
 }

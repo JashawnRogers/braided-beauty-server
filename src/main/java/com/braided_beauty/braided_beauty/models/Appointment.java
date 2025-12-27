@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,9 @@ public class Appointment {
     @JoinColumn(name = "service_id")
     private ServiceModel service;
 
+    @Column(name = "guest_email")
+    private String guestEmail;
+
     @Column(name = "appointment_time", nullable = false, unique = true)
     private LocalDateTime appointmentTime;
 
@@ -55,6 +59,12 @@ public class Appointment {
     @Column(name = "tip_amount")
     private BigDecimal tipAmount;
 
+    @Column(name = "remaining_balance")
+    private BigDecimal remainingBalance; // = (amount of base service + any add-ons) - deposit
+
+    @Column(name = "total_amount")
+    private BigDecimal totalAmount; // = amount of base service + any add-ons + tip
+
     @Column(name = "payment_status", nullable = false)
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;
@@ -70,6 +80,15 @@ public class Appointment {
 
     @Column(name = "loyalty_applied", nullable = false)
     private boolean loyaltyApplied = false;
+
+    @Column(name = "guest_cancel_token")
+    private String guestCancelToken;
+
+    @Column(name = "duration_minutes")
+    private int durationMinutes;
+
+    @Column(name = "hold_expires_at")
+    private LocalDateTime holdExpiresAt;
 
     @ManyToMany
     @JoinTable(

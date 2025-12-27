@@ -20,7 +20,7 @@ public class AdminAppointmentController {
     private final AppointmentService appointmentService;
 
     @PostMapping
-    public ResponseEntity<AppointmentResponseDTO> completeAppointment(
+    public ResponseEntity<AppointmentResponseDTO> adminCompleteAppointmentCash(
             @Parameter(description = "UUID of the appointment to complete", required = true)
             @RequestParam UUID appointmentId) throws StripeException {
         return ResponseEntity.ok(appointmentService.completeAppointment(appointmentId));

@@ -6,9 +6,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Value
 @Builder
-@RequiredArgsConstructor
+@AllArgsConstructor
 @Getter
 @Setter
 public class AppointmentSummaryDTO {

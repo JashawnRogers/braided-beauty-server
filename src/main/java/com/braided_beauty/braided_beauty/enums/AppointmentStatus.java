@@ -1,11 +1,10 @@
 package com.braided_beauty.braided_beauty.enums;
 
 public enum AppointmentStatus {
-    PENDING_CONFIRMATION,
-    BOOKED,
+    PENDING_PAYMENT,
     CONFIRMED,
     CANCELED,
     COMPLETED,
     PAYMENT_FAILED,
-    PAYMENT_IN_PROGRESS
+    PENDING_FINAL_PAYMENT
 }
