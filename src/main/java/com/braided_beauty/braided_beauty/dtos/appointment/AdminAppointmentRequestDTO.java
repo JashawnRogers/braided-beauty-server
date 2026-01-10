@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.dtos.appointment;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -24,6 +25,8 @@ public class AdminAppointmentRequestDTO {
     private final String cancelReason;
 
     private final AppointmentStatus appointmentStatus;
+
+    private final PaymentStatus paymentStatus;
 
     private final LocalDateTime appointmentTime;
 

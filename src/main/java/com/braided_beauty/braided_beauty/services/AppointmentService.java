@@ -1,10 +1,7 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.config.SchedulingConfig;
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.CancelAppointmentDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
@@ -32,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,7 +40,7 @@ import java.util.UUID;
 /**
  * Payment lifecycle for an appointment.
  * Notes:
- * - PENDING: payment has been initiated (e.g., appointment created / checkout session created) but not yet confirmed by webhook.
+ * - PENDING_PAYMENT: payment has been initiated (e.g., appointment created / checkout session created) but not yet confirmed by webhook.
  * - PAID_DEPOSIT: deposit payment succeeded.
  * - COMPLETED: paid-in-full (final payment succeeded).
  * - FAILED: a payment attempt failed.
@@ -64,7 +62,7 @@ public class AppointmentService {
     private final FrontendProps frontendProps;
 
     @Transactional
-    public CheckoutLinkResponse createAppointment(AppointmentRequestDTO dto, AppUserPrincipal principal) throws StripeException {
+    public AppointmentCreateResponseDTO createAppointment(AppointmentRequestDTO dto, AppUserPrincipal principal) throws StripeException {
         ServiceModel service = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
 
@@ -126,29 +124,42 @@ public class AppointmentService {
         if (!conflicts.isEmpty()) throw new ConflictException("This time overlaps with another appointment.");
 
         // ----- status/payment -----
-        BigDecimal total = addOnsTotal.add(appointment.getService().getPrice());
-        BigDecimal deposit = total.multiply(new BigDecimal("0.20"));
+        BigDecimal total = addOnsTotal
+                .add(service.getPrice())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal deposit = total
+                .multiply(new BigDecimal("0.20"))
+                .setScale(2, RoundingMode.HALF_UP);
 
         appointment.setDepositAmount(deposit);
-        if (appointment.getDepositAmount().compareTo(BigDecimal.ZERO) < 1) {
-            appointment.setAppointmentStatus(AppointmentStatus.PENDING_PAYMENT);
-            appointment.setPaymentStatus(PaymentStatus.PENDING);
+
+        if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
+            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+            appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
+            appointment.setHoldExpiresAt(null);
+            appointment.setCreatedAt(LocalDateTime.now());
+            Appointment savedNoDepositRequired = appointmentRepository.save(appointment);
+            return new AppointmentCreateResponseDTO(savedNoDepositRequired.getId(), false, null);
+        } else {
+            appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+            appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
             appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
         }
-        appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
-        appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
+
+        appointment.setCreatedAt(LocalDateTime.now());
 
         Appointment saved = appointmentRepository.save(appointment);
 
         // ----- Call payment service after save -----
         String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
-        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
-        Session session = paymentService.createDepositCheckoutSession(appointment, successUrl, cancelUrl);
+        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
+        Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
 
-        appointment.setStripeSessionId(session.getId());
+        saved.setStripeSessionId(session.getId());
         appointmentRepository.save(saved);
 
-        return new CheckoutLinkResponse(session.getUrl(), appointment.getId());
+        return new AppointmentCreateResponseDTO(saved.getId(),true ,session.getUrl());
     }
 
     @Transactional
@@ -206,26 +217,6 @@ public class AppointmentService {
 
         appointmentRepository.save(appointment);
         return appointmentDtoMapper.toDTO(appointment);
-    }
-
-    @Transactional
-    public AppointmentResponseDTO completeAppointment(UUID appointmentId) throws StripeException{
-
-        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
-                .orElseThrow(() -> new NotFoundException("Appointment not found"));
-
-        appointment.setAppointmentStatus(AppointmentStatus.PENDING_FINAL_PAYMENT);
-        appointmentRepository.save(appointment);
-
-        String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
-        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
-
-        Session session = paymentService.createFinalPaymentSession(appointment, successUrl, cancelUrl, appointment.getTipAmount());
-
-       appointment.setStripeSessionId(session.getId());
-       appointmentRepository.save(appointment);
-
-       return appointmentDtoMapper.toDTO(appointment);
     }
 
     public AppointmentResponseDTO getAppointmentById(UUID appointmentId){

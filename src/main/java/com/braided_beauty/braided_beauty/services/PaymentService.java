@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 
 import java.lang.String;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -99,7 +98,7 @@ public class PaymentService {
                 .stripeSessionId(session.getId())
                 .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(deposit)
-                .paymentStatus(PaymentStatus.PENDING)
+                .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentType(PaymentType.DEPOSIT)
                 .appointment(appointment)
                 .user(appointment.getUser())
@@ -193,7 +192,7 @@ public class PaymentService {
                 .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(finalAmount)
                 .tipAmount(tipAmount)
-                .paymentStatus(PaymentStatus.PENDING)
+                .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentType(PaymentType.FINAL)
                 .appointment(appointment)
                 .user(appointment.getUser())
@@ -221,7 +220,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByStripePaymentIntentId(paymentIntent.getId())
                 .orElseThrow(() -> new NotFoundException("Payment not found for appointment: " + appointmentIdString));
 
-        if ((payment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL && "final".equals(paymentType)) ||
+        if ((payment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH && "final".equals(paymentType)) ||
                 (payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT && "deposit".equals(paymentType))
         ) {
             log.info("PaymentIntent {} already processed (status={})", paymentIntent.getId(), payment.getPaymentStatus());
@@ -239,11 +238,11 @@ public class PaymentService {
 
             log.info("Deposit completed via paymentIntent {} for appointment {}", paymentIntent.getId(), appointmentIdString);
         } else if ("final".equals(paymentType)) {
-            payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+            payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
             paymentRepository.save(payment);
 
             appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-            appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+            appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
             // award loyalty points with idempotent flag
             if (!appointment.isLoyaltyApplied()) {
                 loyaltyService.awardForCompletedAppointment(appointment.getUser());
@@ -270,8 +269,8 @@ public class PaymentService {
 
         appointmentRepository.findById(appointmentId)
                 .ifPresent(appointment -> {
-                    appointment.setAppointmentStatus(AppointmentStatus.PAYMENT_FAILED);
-                    appointment.setPaymentStatus(PaymentStatus.FAILED);
+                    appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
+                    appointment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
                     appointment.setHoldExpiresAt(null);
                     appointmentRepository.save(appointment);
                     log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, paymentIntent.getId());

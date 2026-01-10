@@ -30,7 +30,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                     a.appointment_status = 'CONFIRMED'
                     
                     OR (
-                    a.appointment_status = 'PENDING_PAYMENT'
+                    a.appointment_status = 'PENDING_CONFIRMATION'
                     AND a.hold_expires_at IS NOT NULL
                     AND a.hold_expires_at > now())
                 )

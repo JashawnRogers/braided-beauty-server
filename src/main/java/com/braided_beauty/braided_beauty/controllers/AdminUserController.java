@@ -51,6 +51,12 @@ public class AdminUserController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserMemberProfileResponseDTO> getMemberById(@PathVariable UUID userId) {
+        return ResponseEntity.ok(userService.getMemberById(userId));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/{userId}")
     public ResponseEntity<UserSummaryResponseDTO> updateUserRole(
             @Parameter(description = "UUID of the user", required = true)

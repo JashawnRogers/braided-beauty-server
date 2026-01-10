@@ -1,9 +1,6 @@
 package com.braided_beauty.braided_beauty.controllers;
 
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
-import com.braided_beauty.braided_beauty.dtos.appointment.CancelAppointmentDTO;
+import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.services.AppointmentService;
@@ -29,7 +26,7 @@ public class AppointmentController {
 
 
     @PostMapping("/book")
-    public ResponseEntity<CheckoutLinkResponse> createAppointment(
+    public ResponseEntity<AppointmentCreateResponseDTO> createAppointment(
             @Valid @RequestBody AppointmentRequestDTO dto, @AuthenticationPrincipal AppUserPrincipal principal) throws StripeException {
         return ResponseEntity.ok(appointmentService.createAppointment(dto, principal));
     }

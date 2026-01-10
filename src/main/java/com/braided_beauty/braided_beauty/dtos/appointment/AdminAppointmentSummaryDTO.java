@@ -17,12 +17,19 @@ import java.util.UUID;
 @Getter
 @Setter
 public class AdminAppointmentSummaryDTO {
-    private final UUID appointmentId;
+    private final UUID id;
     private final LocalDateTime appointmentTime;
     private final AppointmentStatus appointmentStatus;
+    private final UUID serviceId;
     private final String serviceName;
-    private final List<String> addOns;
+    private final List<UUID> addOnIds;
     private final PaymentStatus paymentStatus;
     private final BigDecimal remainingBalance;
     private final BigDecimal totalAmount;
+    private final String customerName;
+    private final String customerEmail;
+    private final BigDecimal tipAmount;
+    private final LocalDateTime createdAt;
+    private final LocalDateTime updatedAt;
+    private final String note;
 }

@@ -4,7 +4,6 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummar
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
-import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
@@ -15,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @AllArgsConstructor
@@ -62,10 +62,16 @@ public class AppointmentDtoMapper {
     }
 
     public AdminAppointmentSummaryDTO toAdminSummaryDTO(Appointment appointment) {
+        UUID serviceId = appointment.getService().getId();
         String serviceName = appointment.getService().getName();
         BigDecimal deposit = Optional.ofNullable(appointment.getDepositAmount()).orElse(BigDecimal.ZERO);
         BigDecimal tip = Optional.ofNullable(appointment.getTipAmount()).orElse(BigDecimal.ZERO);
         BigDecimal servicePrice = Optional.ofNullable(appointment.getService().getPrice()).orElse(BigDecimal.ZERO);
+
+        List<UUID> addOnIds = appointment.getAddOns().stream()
+                .map(AddOn::getId)
+                .filter(Objects::nonNull)
+                .toList();
 
         BigDecimal totalPriceOfAddOns =
                 appointment.getAddOns().stream()
@@ -86,16 +92,30 @@ public class AppointmentDtoMapper {
                 .map(AddOn::getName)
                 .toList();
 
+        String customerName = appointment.getUser().getName() != null ?
+                appointment.getUser().getName() :
+                "Guest";
+
+        String customerEmail = appointment.getGuestEmail() != null ?
+                appointment.getGuestEmail() :
+                appointment.getUser().getEmail();
 
         return AdminAppointmentSummaryDTO.builder()
-                .appointmentId(appointment.getId())
+                .id(appointment.getId())
                 .appointmentTime(appointment.getAppointmentTime())
                 .appointmentStatus(appointment.getAppointmentStatus())
+                .serviceId(serviceId)
                 .serviceName(serviceName)
-                .addOns(addOns)
+                .addOnIds(addOnIds)
                 .paymentStatus(appointment.getPaymentStatus())
                 .remainingBalance(remainingBalance)
                 .totalAmount(totalAmount)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .tipAmount(appointment.getTipAmount())
+                .createdAt(appointment.getCreatedAt())
+                .updatedAt(appointment.getUpdatedAt())
+                .note(appointment.getNote())
                 .build();
     }
 }

@@ -59,6 +59,15 @@ public class UserService {
         return userMemberDtoMapper.toCurrentUserDTO(user, tier);
     }
 
+    public UserMemberProfileResponseDTO getMemberById(UUID id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found."));
+
+        LoyaltyTier tier = loyaltyService.calculateLoyaltyTier(user.getLoyaltyRecord().getPoints());
+
+        return userMemberDtoMapper.toDTO(user, tier);
+    }
+
     public List<AppointmentResponseDTO> getAppointmentHistory(UUID userId){
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User does not exist."));

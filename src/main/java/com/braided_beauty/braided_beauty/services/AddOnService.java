@@ -36,7 +36,6 @@ public class AddOnService {
 
     public List<AddOn> getAddOnIds(List<UUID> ids) {
         return addOnRepository.findAllById(ids);
-
     }
 
     @Transactional

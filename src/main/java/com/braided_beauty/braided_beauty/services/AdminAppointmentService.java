@@ -19,6 +19,9 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.apache.coyote.BadRequestException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -78,7 +81,7 @@ public class AdminAppointmentService {
         }
 
         appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-        appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+        appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_CASH);
         appointment.setUpdatedAt(LocalDateTime.now());
 
         appointmentRepository.save(appointment);
@@ -86,7 +89,11 @@ public class AdminAppointmentService {
     }
 
     @Transactional
-    public AdminAppointmentSummaryDTO adminUpdateAppointment(AdminAppointmentRequestDTO dto) {
+    public AdminAppointmentSummaryDTO adminUpdateAppointment(UUID id, AdminAppointmentRequestDTO dto) throws BadRequestException {
+        if (dto.getAppointmentId() == null || !dto.getAppointmentId().equals(id)) {
+            throw new BadRequestException("Path id and body appointmentId must match");
+        }
+
         Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
                 .orElseThrow(() -> new NotFoundException("Appointment not found with ID: " + dto.getAppointmentId()));
 
@@ -94,34 +101,49 @@ public class AdminAppointmentService {
             appointment.setNote(dto.getNote().trim());
         }
 
-        if (dto.getAppointmentStatus() == AppointmentStatus.CANCELED) {
-            if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()) {
-                appointment.setCancelReason(dto.getCancelReason().trim());
-            }
-            appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
-        }
-
         if (dto.getServiceId() != null) {
             ServiceModel service = serviceRepository.findById(dto.getServiceId())
                             .orElseThrow(() -> new NotFoundException("Service not found"));
             appointment.setService(service);
-            appointment.setAddOns(List.of());
         }
 
-        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
-            List<AddOn> addOns = addOnRepository.findAllById(dto.getAddOnIds());
-            if (addOns.size() != dto.getAddOnIds().size()) {
-                throw new NotFoundException("One or more add-ons not found");
+        if (dto.getAddOnIds() != null) {
+            if (dto.getAddOnIds().isEmpty()) {
+                appointment.getAddOns().clear();
+            } else {
+                List<AddOn> addOns = addOnRepository.findAllById(dto.getAddOnIds());
+                if (addOns.size() != dto.getAddOnIds().size()) {
+                    throw new NotFoundException("One or more add-ons not found");
+                }
+                appointment.getAddOns().clear();
+                appointment.getAddOns().addAll(addOns);
             }
-            appointment.setAddOns(addOns);
         }
 
         if (dto.getTipAmount() != null) {
             appointment.setTipAmount(dto.getTipAmount());
         }
 
-        appointmentRepository.save(appointment);
-        return appointmentDtoMapper.toAdminSummaryDTO(appointment);
+        if (dto.getAppointmentStatus() != null
+        && dto.getAppointmentStatus() != appointment.getAppointmentStatus()) {
+            appointment.setAppointmentStatus(dto.getAppointmentStatus());
+        }
+
+        if (dto.getPaymentStatus() != null
+        && dto.getPaymentStatus() != appointment.getPaymentStatus()) {
+            appointment.setPaymentStatus(dto.getPaymentStatus());
+        }
+
+        if (dto.getAppointmentStatus() == AppointmentStatus.CANCELED) {
+            if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()) {
+                appointment.setCancelReason(dto.getCancelReason().trim());
+            }
+        }
+
+        appointment.setUpdatedAt(LocalDateTime.now());
+
+        Appointment saved = appointmentRepository.save(appointment);
+        return appointmentDtoMapper.toAdminSummaryDTO(saved);
     }
 
     @Transactional
@@ -135,5 +157,16 @@ public class AdminAppointmentService {
         Session session = paymentService.createFinalPaymentSession(appointment, successUrl, cancelUrl, tipAmount);
 
         return new CheckoutLinkResponse(session.getUrl(), appointment.getId());
+    }
+
+    public Page<AdminAppointmentSummaryDTO> getAllAppointments(Pageable pageable) {
+        return appointmentRepository.findAll(pageable)
+                .map(appointmentDtoMapper::toAdminSummaryDTO);
+    }
+
+    public AdminAppointmentSummaryDTO getAppointmentById(UUID id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
+        return appointmentDtoMapper.toAdminSummaryDTO(appointment);
     }
 }
