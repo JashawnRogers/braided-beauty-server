@@ -13,6 +13,7 @@ public record BookingConfirmationDTO(
         Integer durationMinutes,
         BigDecimal depositAmount,
         BigDecimal totalAmountRemaining,
-        PaymentStatus paymentStatus
+        PaymentStatus paymentStatus,
+        BigDecimal remainingBalance
 ) {
 }

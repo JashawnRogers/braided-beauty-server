@@ -77,4 +77,22 @@ public class AppointmentController {
     ) {
         return ResponseEntity.ok(appointmentConfirmationService.getConfirmationBySessionId(sessionId));
     }
+
+    @GetMapping(value = "/confirm/ics", produces = "text/calendar")
+    public ResponseEntity<String> getIcsByToken(@RequestParam UUID id, @RequestParam String token) {
+        String ics = appointmentConfirmationService.buildIcs(id, token);
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/calendar; charset=utf-8")
+                .header("Content-Disposition", "inline; filename=braided-beauty-appointment.ics")
+                .body(ics);
+    }
+
+    @GetMapping(value = "/confirm/ics/by-session", produces = "text/calendar")
+    public ResponseEntity<String> getIcsBySession(@RequestParam("sessionId") String sessionId) {
+        String ics = appointmentConfirmationService.buildIcs(sessionId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/calendar; charset=utf-8")
+                .header("Content-Disposition", "inline; filename=braided-beauty-appointment.ics")
+                .body(ics);
+    }
 }

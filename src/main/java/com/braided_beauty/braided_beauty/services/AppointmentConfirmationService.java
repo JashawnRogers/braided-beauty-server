@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.services;
 
+import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.Appointment;
@@ -16,6 +17,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 @Service
@@ -88,7 +93,8 @@ public class AppointmentConfirmationService {
                 appointment.getDurationMinutes(),
                 appointment.getDepositAmount(),
                 appointment.getRemainingBalance(),
-                appointment.getPaymentStatus()
+                appointment.getPaymentStatus(),
+                appointment.getRemainingBalance()
                 );
     }
 
@@ -109,7 +115,100 @@ public class AppointmentConfirmationService {
                 appointment.getDurationMinutes(),
                 appointment.getDepositAmount(),
                 appointment.getRemainingBalance(),
-                appointment.getPaymentStatus()
+                appointment.getPaymentStatus(),
+                appointment.getRemainingBalance()
         );
+    }
+
+    @Transactional
+    public String buildIcs(UUID appointmentId, String token) {
+        BookingConfirmationDTO dto = getConfirmationByToken(appointmentId, token);
+
+        Appointment appointment = appointmentRepository.findById(dto.appointmentId())
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
+
+        if (appointment.getBookingConfirmationJti() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Confirmation link is no longer available");
+        }
+
+        if (appointment.getAppointmentStatus() != AppointmentStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Deposit for appointment has not been paid");
+        }
+
+        ZonedDateTime start = dto.appointmentTime().atZone(ZoneId.of("America/Phoenix"));
+        ZonedDateTime end = start.plusMinutes(dto.durationMinutes());
+
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+        String dtStartUtc = start.withZoneSameInstant(ZoneOffset.UTC).format(format);
+        String dtEndUtc = end.withZoneSameInstant(ZoneOffset.UTC).format(format);
+
+        String uid = dto.appointmentId() + "@braided-beauty";
+
+        return String.join("\r\n",
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//Braided Beauty//Booking//EN",
+                "CALSCALE:GREGORIAN",
+                "METHOD:PUBLISH",
+                "UID:" + uid,
+                "DTSTAMP:" + ZonedDateTime.now(ZoneOffset.UTC).format(format),
+                "DTSTART:" + dtStartUtc,
+                "DTEND:" + dtEndUtc,
+                "SUMMARY:" + escapeIcs("Braided Beauty - " + dto.serviceName()),
+                "DESCRIPTION:" + escapeIcs("Deposit: $" + dto.depositAmount() + " | Remaining: $" + dto.remainingBalance()),
+                "END:VEVENT",
+                "END:VCALENDAR",
+                ""
+                );
+    }
+
+    @Transactional
+    public String buildIcs(String sessionId) {
+        Appointment appointment = appointmentRepository.findByStripeSessionId(sessionId)
+                .orElseThrow(() -> new NotFoundException("No appointment found from session: " + sessionId));
+
+        if (appointment.getBookingConfirmationJti() == null) {
+           throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Confirmation link is no longer available");
+        }
+
+        if (appointment.getAppointmentStatus() != AppointmentStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Deposit for appointment has not been paid");
+        }
+
+        BookingConfirmationDTO dto = getConfirmationBySessionId(appointment.getStripeSessionId());
+
+        ZonedDateTime start = dto.appointmentTime().atZone(ZoneId.of("America/Phoenix"));
+        ZonedDateTime end = start.plusMinutes(dto.durationMinutes());
+
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+        String dtStartUtc = start.withZoneSameInstant(ZoneOffset.UTC).format(format);
+        String dtEndUtc = end.withZoneSameInstant(ZoneOffset.UTC).format(format);
+
+        String uid = dto.appointmentId() + "@braided-beauty";
+
+        return String.join("\r\n",
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//Braided Beauty//Booking//EN",
+                "CALSCALE:GREGORIAN",
+                "METHOD:PUBLISH",
+                "UID:" + uid,
+                "DTSTAMP:" + ZonedDateTime.now(ZoneOffset.UTC).format(format),
+                "DTSTART:" + dtStartUtc,
+                "DTEND:" + dtEndUtc,
+                "SUMMARY:" + escapeIcs("Braided Beauty - " + dto.serviceName()),
+                "DESCRIPTION:" + escapeIcs("Deposit: $" + dto.depositAmount() + " | Remaining: $" + dto.remainingBalance()),
+                "END:VEVENT",
+                "END:VCALENDAR",
+                ""
+        );
+    }
+
+    private String escapeIcs(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace(",", "\\,")
+                .replace(";", "\\;");
     }
 }
