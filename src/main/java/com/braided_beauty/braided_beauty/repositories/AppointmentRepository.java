@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import javax.swing.text.html.Option;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -41,6 +42,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                                                   @Param("bufferMinutes") int bufferMinutes
                                                   );
 
+    Optional<Appointment> findByStripeSessionId(String sessionId);
     List<Appointment> findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(LocalDateTime start, LocalDateTime end);
     List<Appointment> findAllByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
     Optional<Appointment> findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(UUID userId, LocalDateTime now,

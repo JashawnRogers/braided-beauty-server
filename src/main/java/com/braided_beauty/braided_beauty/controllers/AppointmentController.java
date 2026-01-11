@@ -2,14 +2,14 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
-import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
+import com.braided_beauty.braided_beauty.records.BookingConfirmationDTO;
+import com.braided_beauty.braided_beauty.services.AppointmentConfirmationService;
 import com.braided_beauty.braided_beauty.services.AppointmentService;
 import com.stripe.exception.StripeException;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AppointmentController {
     private final AppointmentService appointmentService;
-
+    private final AppointmentConfirmationService appointmentConfirmationService;
 
     @PostMapping("/book")
     public ResponseEntity<AppointmentCreateResponseDTO> createAppointment(
@@ -48,8 +48,7 @@ public class AppointmentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<AppointmentResponseDTO>> getAllAppointmentsByDate(
-            @RequestParam("date") @org.springframework.format.annotation.DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date){
+    public ResponseEntity<List<AppointmentResponseDTO>> getAllAppointmentsByDate(LocalDate date){
         return ResponseEntity.ok(appointmentService.getAllAppointmentsByDate(date));
     }
 
@@ -65,5 +64,17 @@ public class AppointmentController {
     public ResponseEntity<AppointmentSummaryDTO> getNextAppointment(@AuthenticationPrincipal AppUserPrincipal principal){
         AppointmentSummaryDTO nextAppointment = appointmentService.getNextAppointment(principal.id()).orElse(null);
         return ResponseEntity.ok(nextAppointment);
+    }
+
+    @GetMapping("/confirm")
+    public ResponseEntity<?> getBookingConfirmation(@RequestParam UUID id, @RequestParam String token) {
+        return ResponseEntity.ok(appointmentConfirmationService.getConfirmationByToken(id, token));
+    }
+
+    @GetMapping("/confirm/by-session")
+    public ResponseEntity<BookingConfirmationDTO> getBookingConfirmationBySession(
+            @RequestParam("sessionId") String sessionId
+    ) {
+        return ResponseEntity.ok(appointmentConfirmationService.getConfirmationBySessionId(sessionId));
     }
 }

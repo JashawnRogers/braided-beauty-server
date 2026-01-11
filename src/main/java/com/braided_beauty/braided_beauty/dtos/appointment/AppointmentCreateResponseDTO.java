@@ -13,4 +13,5 @@ public class AppointmentCreateResponseDTO {
     private UUID appointmentId;
     private boolean paymentRequired;
     private String checkoutUrl;
+    private String confirmationToken;
 }

@@ -29,7 +29,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
-    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional

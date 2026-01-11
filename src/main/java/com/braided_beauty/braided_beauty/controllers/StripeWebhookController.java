@@ -5,6 +5,7 @@ package com.braided_beauty.braided_beauty.controllers;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.services.PaymentService;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.model.Event;
 import com.stripe.exception.SignatureVerificationException;
@@ -42,9 +43,9 @@ public class StripeWebhookController {
     }
 
     private static final Set<String> ALLOWED_EVENTS = Set.of(
-            "payment_intent.payment_failed",
-            "payment_intent.succeeded"
-
+            "checkout.session.completed",
+            "checkout.session.async_payment_succeeded",
+            "checkout.session.async_payment_failed"
     );
 
     @PostMapping
@@ -65,27 +66,21 @@ public class StripeWebhookController {
         }
 
        switch (event.getType()) {
-          case "payment_intent.succeeded" -> {
-              PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
-                      .getObject()
-                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize PaymentIntent."));
+            case "checkout.session.completed" -> {
+                Session session = (Session) event.getDataObjectDeserializer()
+                        .getObject()
+                        .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize Session"));
 
-              String paymentType = paymentIntent.getMetadata().get("paymentType");
-
-              if ("deposit".equals(paymentType)){
-                  paymentService.handlePaymentIntentSucceeded(paymentIntent);
-                  log.info("Deposit success. paymentIntent: {}", paymentIntent.getId());
-              } else if ("final".equals(paymentType)) {
-                  paymentService.handlePaymentIntentSucceeded(paymentIntent);
-                  log.info("Final payment success. paymentIntent: {}", paymentIntent.getId());
-              }
-          }
-          case "payment_intent.payment_failed" -> {
-              PaymentIntent paymentIntent = (PaymentIntent) event.getDataObjectDeserializer()
+                paymentService.handleCheckoutSessionCompleted(session);
+                log.info("Checkout session completed: {}", session.getId());
+            }
+          case "checkout.session.async_payment_failed" -> {
+              Session session = (Session) event.getDataObjectDeserializer()
                       .getObject()
-                      .orElseThrow(() -> new NotFoundException("Payment object not found."));
-              paymentService.handlePaymentIntentFailed(paymentIntent);
-              log.warn("Payment failed: {}", paymentIntent.getId());
+                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize Session"));
+
+              paymentService.handlePaymentIntentFailed(session);
+              log.warn("Async payment failed. Session={}", session.getId());
           }
           default -> log.info("Unhandled event type: {}", event.getType());
 

@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -89,6 +90,11 @@ public class Appointment {
 
     @Column(name = "hold_expires_at")
     private LocalDateTime holdExpiresAt;
+
+    @Column(name = "booking_confirmation_jti", length = 64)
+    private String bookingConfirmationJti;
+
+    private Instant bookingConfirmationExpiresAt;
 
     @ManyToMany
     @JoinTable(

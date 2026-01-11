@@ -13,6 +13,7 @@ import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
+import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
@@ -32,10 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Payment lifecycle for an appointment.
@@ -57,6 +55,7 @@ public class AppointmentService {
     private final ServiceRepository serviceRepository;
     private final AddOnService addOnService;
     private final PaymentService paymentService;
+    private final AppointmentConfirmationService appointmentConfirmationService;
     private final SchedulingConfig schedulingConfig;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
@@ -94,12 +93,12 @@ public class AppointmentService {
         // ----- service + add-ons -----
         appointment.setService(service);
 
-        List<AddOn> addOns = List.of();
+        List<AddOn> addOns = new ArrayList<>();
         if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
             addOns = addOnService.getAddOnIds(dto.getAddOnIds());
             appointment.setAddOns(addOns);
         } else {
-            appointment.setAddOns(List.of());
+            appointment.setAddOns(new ArrayList<>());
         }
 
         int addOnMinutes = addOns.stream()
@@ -140,7 +139,15 @@ public class AppointmentService {
             appointment.setHoldExpiresAt(null);
             appointment.setCreatedAt(LocalDateTime.now());
             Appointment savedNoDepositRequired = appointmentRepository.save(appointment);
-            return new AppointmentCreateResponseDTO(savedNoDepositRequired.getId(), false, null);
+
+            BookingConfirmationToken confirmationToken = appointmentConfirmationService
+                    .ensureConfirmationTokenForAppointment(savedNoDepositRequired.getId());
+
+            return new AppointmentCreateResponseDTO(
+                    savedNoDepositRequired.getId(),
+                    false,
+                    null, confirmationToken.token()
+            );
         } else {
             appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
             appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
@@ -159,7 +166,7 @@ public class AppointmentService {
         saved.setStripeSessionId(session.getId());
         appointmentRepository.save(saved);
 
-        return new AppointmentCreateResponseDTO(saved.getId(),true ,session.getUrl());
+        return new AppointmentCreateResponseDTO(saved.getId(),true ,session.getUrl(), null);
     }
 
     @Transactional
