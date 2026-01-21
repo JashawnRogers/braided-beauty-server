@@ -2,22 +2,13 @@ package com.braided_beauty.braided_beauty.controllers;
 
 
 
-import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.services.PaymentService;
-import com.stripe.model.PaymentIntent;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.model.Event;
 import com.stripe.exception.SignatureVerificationException;
 
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,7 +43,7 @@ public class StripeWebhookController {
     public ResponseEntity<String> handleWebhook(@RequestBody String payload,
                                                 @RequestHeader("Stripe-Signature") String sigHeader) {
         Event event;
-
+        log.warn(">>>> STRIPE WEBHOOK HIT <<<<");
         try{
             event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
         } catch (SignatureVerificationException e) {
@@ -64,9 +55,9 @@ public class StripeWebhookController {
             log.info("Ignoring event type: {}", event.getType());
             return ResponseEntity.ok("Event type ignored.");
         }
-
+        log.info("Event type: {}", event.getType());
        switch (event.getType()) {
-            case "checkout.session.completed" -> {
+            case "checkout.session.completed", "checkout.session.async_payment_succeeded" -> {
                 Session session = (Session) event.getDataObjectDeserializer()
                         .getObject()
                         .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize Session"));
@@ -79,7 +70,7 @@ public class StripeWebhookController {
                       .getObject()
                       .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize Session"));
 
-              paymentService.handlePaymentIntentFailed(session);
+              paymentService.handleCheckoutSessionFailed(session);
               log.warn("Async payment failed. Session={}", session.getId());
           }
           default -> log.info("Unhandled event type: {}", event.getType());

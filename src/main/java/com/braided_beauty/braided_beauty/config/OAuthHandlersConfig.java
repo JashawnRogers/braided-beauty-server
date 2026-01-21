@@ -1,10 +1,15 @@
 package com.braided_beauty.braided_beauty.config;
 
+import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
+import com.braided_beauty.braided_beauty.records.OAuthIdentity;
 import com.braided_beauty.braided_beauty.services.AuthService;
 import com.braided_beauty.braided_beauty.services.JwtService;
+import com.braided_beauty.braided_beauty.services.OAuthUserService;
 import com.braided_beauty.braided_beauty.services.RefreshTokenService;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -13,38 +18,36 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 import java.time.Duration;
-import java.util.UUID;
 
 @Configuration
 public class OAuthHandlersConfig {
+    @Value("${app.cookies.secure}")
+    private boolean secureCookie;
+
+    @Value("${app.cookies.same-site}")
+    private String sameSite;
 
     @Bean
-    AuthenticationSuccessHandler oauth2SuccessHandler(AuthService authService, JwtService jwtService,
-                                                      RefreshTokenService refreshTokenService) {
+    AuthenticationSuccessHandler oauth2SuccessHandler(OAuthUserService oAuthUserService, RefreshTokenService refreshTokenService) {
         return (req, res, authentication) -> {
             // Convert provider Authentication to AppUserPrincipal based Authentication
-            Authentication appAuth = authService.toAppAuthentication(authentication);
-            AppUserPrincipal principal = (AppUserPrincipal) appAuth.getPrincipal();
+            OAuthIdentity id = oAuthUserService.extractIdentity(authentication);
 
-            UUID userId = principal.id();
-            String email = principal.email();
-            String name = principal.name();
+            User user = oAuthUserService.upsertFromOauth(id);
 
-            String accessToken = jwtService.generateAccessToken(userId, email, name, appAuth.getAuthorities());
-
-            var issued = refreshTokenService.issueForUser(userId, "web");
+            var issued = refreshTokenService.issueForUser(user.getId(), "web");
             addRefreshToken(res, issued.getRefreshToken());
 
             // Deliver accessToken back to frontend
-            res.sendRedirect("http://localhost:5173/auth/callback?token=" + accessToken);
+            res.sendRedirect("http://localhost:5173/auth/callback");
         };
     }
 
     private void addRefreshToken(HttpServletResponse res, String refreshToken) {
         ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false)
-                .sameSite("None")
+                .secure(secureCookie)
+                .sameSite(sameSite)
                 .path("/")
                 .maxAge(Duration.ofDays(14))
                 .build();

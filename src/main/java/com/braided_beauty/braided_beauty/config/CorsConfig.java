@@ -1,20 +1,26 @@
 package com.braided_beauty.braided_beauty.config;
 
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 public class CorsConfig {
+
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-        corsConfig.setAllowedOrigins(java.util.List.of("http://localhost:5173", "https://s3.us-west-1.amazonaws.com"));
+        corsConfig.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
         corsConfig.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
-        corsConfig.setAllowedHeaders(java.util.List.of("*"));
+        corsConfig.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "Stripe-Signature"));
+        corsConfig.setExposedHeaders(List.of("Set-Cookie"));
         corsConfig.setAllowCredentials(true); // <-- required for cookies
         corsConfig.setMaxAge(3600L);
 
-        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfig);
         return source;
     }

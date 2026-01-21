@@ -3,6 +3,8 @@ package com.braided_beauty.braided_beauty.controllers;
 import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationDTO;
+import com.braided_beauty.braided_beauty.records.ConfirmationReceiptDTO;
+import com.braided_beauty.braided_beauty.records.FinalPaymentConfirmationDTO;
 import com.braided_beauty.braided_beauty.services.AppointmentConfirmationService;
 import com.braided_beauty.braided_beauty.services.AppointmentService;
 import com.stripe.exception.StripeException;
@@ -72,10 +74,17 @@ public class AppointmentController {
     }
 
     @GetMapping("/confirm/by-session")
-    public ResponseEntity<BookingConfirmationDTO> getBookingConfirmationBySession(
+    public ResponseEntity<ConfirmationReceiptDTO> getBookingConfirmationBySession(
             @RequestParam("sessionId") String sessionId
     ) {
         return ResponseEntity.ok(appointmentConfirmationService.getConfirmationBySessionId(sessionId));
+    }
+
+    @GetMapping("/final/confirm/by-session")
+    public ResponseEntity<ConfirmationReceiptDTO> getFinalPaymentConfirmationBySession(
+            @RequestParam("sessionId") String sessionId
+    ) {
+        return ResponseEntity.ok(appointmentConfirmationService.getFinalConfirmationBySessionId(sessionId));
     }
 
     @GetMapping(value = "/confirm/ics", produces = "text/calendar")

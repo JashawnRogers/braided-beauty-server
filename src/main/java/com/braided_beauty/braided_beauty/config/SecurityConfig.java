@@ -1,10 +1,7 @@
 package com.braided_beauty.braided_beauty.config;
 
-import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
-import com.braided_beauty.braided_beauty.services.AuthService;
-import com.braided_beauty.braided_beauty.services.JwtService;
-import com.braided_beauty.braided_beauty.services.RefreshTokenService;
+import com.braided_beauty.braided_beauty.services.*;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,8 +28,7 @@ import java.util.UUID;
 public class SecurityConfig {
 
     private final JwtDecoder jwtDecoder;
-    private final JwtService jwtService;
-    private final AuthService authService;
+    private final OAuthUserService oauthService;
     private final RefreshTokenService refreshTokenService;
     private final OAuthHandlersConfig oAuthHandlersConfig;
 
@@ -55,8 +51,9 @@ public class SecurityConfig {
             String name = jwt.getClaimAsString("name");
             String email = jwt.getClaimAsString("email");
 
-            // Build domain principal
-            AppUserPrincipal principal = new AppUserPrincipal(userId, name, email, authorities);
+            Boolean enabledClaim = jwt.getClaimAsBoolean("enabled");
+            boolean enabled = enabledClaim == null ? true : enabledClaim;
+            AppUserPrincipal principal = new AppUserPrincipal(userId, email, name, authorities, null, enabled);
 
             // Wrap in Authentication Object
             // Credentials = jwt to keep access to raw token
@@ -66,73 +63,46 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(1)
-    public SecurityFilterChain oauth2Chain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity
-                .securityMatcher("/oauth2/**", "/login/oauth2/**")
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .cors(c -> {}) // Initialize with custom CorsConfig
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
+                        // OAuth entry
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        // Public API
+                        .requestMatchers(
+                                "/api/v1/service/**",
+                                "/api/v1/category/**",
+                                "/api/v1/availability/**",
+                                "/api/v1/auth/**",
+                                "/api/v1/appointments/book",
+                                "/api/v1/appointments/guest/cancel",
+                                "/api/v1/appointments/confirm",
+                                "/api/v1/appointments/confirm/by-session",
+                                "/api/v1/appointments/confirm/ics",
+                                "/api/v1/appointments/confirm/ics/by-session",
+                                "/error"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/webhook/stripe").permitAll()
+                        // Everything else secured
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        .successHandler(oAuthHandlersConfig.oauth2SuccessHandler(authService, jwtService, refreshTokenService))
-                )
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/oauth2/**", "/login/oauth2/**", "/api/v1/auth/login/**"));
-
-        return httpSecurity.build();
-    }
-
-    @Bean
-    @Order(2)
-    SecurityFilterChain apiChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity
-                .cors(org.springframework.security.config.Customizer.withDefaults())
-                .securityMatcher("/api/**")
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/",
-                                "/index.html",
-                                "/static/**",
-                                "/assets/**",
-                                "/favicon.ico",
-                                "/api/v1/service",
-                                "/api/v1/service/**",
-                                "/api/v1/category",
-                                "/api/v1/availability",
-                                "/api/v1/appointments",
-                                "/api/v1/auth/**",
-                                "/error"
-
-                        ).permitAll()
-
-                        // User protected routes
-                        .requestMatchers("/api/v1/user/dashboard/me",
-                                "/api/v1/appointments/**",
-                                "/api/v1/appointments/book",
-                                "/api/v1/appointments/cancel",
-                                "/api/v1/user/user/**",
-                                "/api/v1/user/appointments",
-                                "/api/v1/user/loyalty-points"
-                                ).authenticated()
-                                .requestMatchers("/api/v1/admin/**").authenticated()
-
-                                // All other routes are protected
-                                .anyRequest().authenticated()
-//                        .requestMatchers(HttpMethod.GET, "/api/v1/service/**").permitAll()
-//                        .requestMatchers(HttpMethod.GET,"/api/v1/**").permitAll()
-//                        .requestMatchers(HttpMethod.PUT,"/api/v1/**").permitAll()
-//                        .requestMatchers(HttpMethod.POST,"/api/v1/**").permitAll()
-//                        .requestMatchers(HttpMethod.DELETE,"/api/v1/**").permitAll()
-//                        .requestMatchers(HttpMethod.POST, "/api/v1/appointments/**").permitAll()
-//                        .requestMatchers(HttpMethod.POST, "/api/v1/stripe/webhook").permitAll()
-//                        .anyRequest().authenticated()
+                        .successHandler(oAuthHandlersConfig.oauth2SuccessHandler(oauthService, refreshTokenService))
+                        .failureHandler((req, res, ex) -> {
+                            ex.printStackTrace();
+                            res.sendRedirect("http://localhost:5173/login?oauth=failed");
+                        })
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .decoder(jwtDecoder)
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                );
-
-        return httpSecurity.build();
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
+                )
+                .build();
     }
+
 }

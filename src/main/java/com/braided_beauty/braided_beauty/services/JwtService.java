@@ -19,7 +19,7 @@ public class JwtService {
 
     private final JwtEncoder jwtEncoder;
 
-    public String generateAccessToken(UUID userId, String email, String name, Collection< ? extends GrantedAuthority> authorities) {
+    public String generateAccessToken(UUID userId, String email, String name, Collection< ? extends GrantedAuthority> authorities, boolean enabled) {
         Instant now = Instant.now();
 
         // previously used "scope" which can be processed by spring security but is mainly meant for OAuth2 flows
@@ -36,6 +36,7 @@ public class JwtService {
                 .claim("email", email)
                 .claim("name", name != null ? name : email) // Name is not required but nice to have, so fallback is email that is required.
                 .claim("roles", roles)
+                .claim("enabled", enabled)
                 .build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();

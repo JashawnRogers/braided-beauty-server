@@ -64,7 +64,6 @@ public class AppointmentDtoMapper {
     public AdminAppointmentSummaryDTO toAdminSummaryDTO(Appointment appointment) {
         UUID serviceId = appointment.getService().getId();
         String serviceName = appointment.getService().getName();
-        BigDecimal deposit = Optional.ofNullable(appointment.getDepositAmount()).orElse(BigDecimal.ZERO);
         BigDecimal tip = Optional.ofNullable(appointment.getTipAmount()).orElse(BigDecimal.ZERO);
         BigDecimal servicePrice = Optional.ofNullable(appointment.getService().getPrice()).orElse(BigDecimal.ZERO);
 
@@ -79,18 +78,10 @@ public class AppointmentDtoMapper {
                         .filter(Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal remainingBalance = servicePrice
-                        .add(totalPriceOfAddOns)
-                        .subtract(deposit);
 
         BigDecimal totalAmount = servicePrice
                 .add(totalPriceOfAddOns)
                 .add(tip);
-
-        List<String> addOns = appointment.getAddOns()
-                .stream()
-                .map(AddOn::getName)
-                .toList();
 
         String customerName = appointment.getUser().getName() != null ?
                 appointment.getUser().getName() :
@@ -108,7 +99,7 @@ public class AppointmentDtoMapper {
                 .serviceName(serviceName)
                 .addOnIds(addOnIds)
                 .paymentStatus(appointment.getPaymentStatus())
-                .remainingBalance(remainingBalance)
+                .remainingBalance(appointment.getRemainingBalance())
                 .totalAmount(totalAmount)
                 .customerName(customerName)
                 .customerEmail(customerEmail)

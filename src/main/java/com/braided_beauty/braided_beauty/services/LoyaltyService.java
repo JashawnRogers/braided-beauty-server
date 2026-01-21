@@ -6,12 +6,19 @@ import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.loyaltyRecord.LoyaltyRecordDtoMapper;
 import com.braided_beauty.braided_beauty.models.LoyaltyRecord;
+import com.braided_beauty.braided_beauty.models.LoyaltySettings;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.repositories.LoyaltyRecordRepository;
 import com.braided_beauty.braided_beauty.repositories.LoyaltySettingsRepository;
+import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @AllArgsConstructor
@@ -19,22 +26,40 @@ public class LoyaltyService {
     private final LoyaltySettingsRepository settingsRepo;
     private final LoyaltyRecordRepository recordRepo;
     private final LoyaltyRecordDtoMapper mapper;
-
-
+    private final UserRepository userRepository;
+    private static final Logger log = LoggerFactory.getLogger(LoyaltyService.class);
 
     @Transactional
-    public void awardSignUpBonus(User user) {
-        var settings = settingsRepo.findAny()
-                .orElseThrow(() -> new NotFoundException("Settings object not found"));
-        if (!settings.isProgramEnabled()) return;
+    public void attachLoyaltyRecord(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found."));
 
-        var record = recordRepo.findById(user.getId())
-                .orElseGet(() -> recordRepo.save(new LoyaltyRecord(user)));
+        if (user.getLoyaltyRecord() != null) return;
+
+        user.applyLoyaltyRecord(new LoyaltyRecord());
+    }
+
+    @Transactional
+    public void awardSignUpBonus(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found."));
+
+        LoyaltySettings settings = settingsRepo.findAny()
+                .orElseThrow(() -> new NotFoundException("Settings object not found"));
+        if (!settings.isProgramEnabled())
+            throw new ConflictException("Loyalty program disabled. Early exiting without awarding sign up bonus.");
+
+        LoyaltyRecord record = recordRepo.findById(user.getId())
+                .orElseGet(() -> {
+                    attachLoyaltyRecord(userId);
+                    return user.getLoyaltyRecord();
+                });
 
         if (record.isSignupBonusAwarded()) return;
 
-        int bonus = settings.getSignUpBonusPoints() != null ? settings.getSignUpBonusPoints() : 0;
-        if (bonus <= 0) return;
+        int bonus = settings.getSignUpBonusPoints() != null
+                && settings.getSignUpBonusPoints() > 0
+                ? settings.getSignUpBonusPoints() : 0;
 
         record.addPoints(bonus);
         record.setSignupBonusAwarded(true);
@@ -42,44 +67,44 @@ public class LoyaltyService {
     }
 
     @Transactional
-    public void awardForCompletedAppointment(User user) {
+    public void awardForCompletedAppointment(UUID userId) {
         var settings = settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found"));
-        if (!settings.isProgramEnabled()) return;
+        if (!settings.isProgramEnabled())
+            throw new IllegalStateException("Loyalty program disabled. Points not awarded");
 
-        var record = recordRepo.findById(user.getId())
+
+        LoyaltyRecord record = recordRepo.findByUserId(userId)
                 .orElseThrow(() -> new NotFoundException("Loyalty record missing"));
 
-        if (!record.getEnabled()) return;
+        if (!record.getEnabled())
+            throw new IllegalStateException("Loyalty record not enabled. Loyalty points not awarded.");
 
-        int earn = settings.getEarnPerAppointment() != null ? settings.getEarnPerAppointment() : 0;
-        if (earn <= 0) return;
+        int earn = settings.getSignUpBonusPoints() != null
+                && settings.getSignUpBonusPoints() > 0
+                ? settings.getSignUpBonusPoints() : 0;
 
         record.addPoints(earn);
+        record.setUpdatedAt(LocalDateTime.now());
         recordRepo.save(record);
     }
 
     @Transactional
-    public void redeem(User user, int pointsToRedeem) {
-        if (pointsToRedeem <= 0) throw new IllegalArgumentException("Insufficient redemption points");
-
-        var settings = settingsRepo.findAny()
+    public void redeem(UUID userId, int pointsToRedeem) {
+        LoyaltySettings settings = settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found"));
-        if (!settings.isProgramEnabled()) throw new ConflictException("Loyalty program disabled");
+        if (!settings.isProgramEnabled()) throw new ConflictException("Loyalty program is disabled");
 
-        var record = recordRepo.findById(user.getId())
+        LoyaltyRecord record = recordRepo.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Loyalty record missing"));
 
-        if (record.getPoints() < pointsToRedeem) throw new ConflictException("Insufficient redemption points");
-
-        record.setPoints(record.getPoints() - pointsToRedeem);
-        record.setRedeemedPoints(record.getRedeemedPoints() + pointsToRedeem);
+        record.redeemPoints(pointsToRedeem);
         recordRepo.save(record);
     }
 
     @Transactional
     public LoyaltySettingsDTO updateSettings(LoyaltySettingsDTO dto) {
-        var settings = settingsRepo.findAny()
+        LoyaltySettings settings = settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found"));
 
         if (dto.getEarnPerAppointment() != null) {
@@ -105,14 +130,13 @@ public class LoyaltyService {
         return mapper.toDTO(settings);
     }
 
-    @Transactional
     public LoyaltySettingsDTO getSettings() {
         return mapper.toDTO(settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found")));
     }
 
     public LoyaltyTier calculateLoyaltyTier(int points) {
-        var settings = settingsRepo.findAny()
+        LoyaltySettings settings = settingsRepo.findAny()
                 .orElseThrow(() -> new NotFoundException("Settings object not found"));
 
         Integer goldTier = settings.getGoldTierThreshold();
@@ -120,7 +144,6 @@ public class LoyaltyService {
 
         if (goldTier != null && points >= goldTier) return LoyaltyTier.GOLD;
         if (silverTier != null && points >= silverTier) return LoyaltyTier.SILVER;
-
         return LoyaltyTier.BRONZE;
     }
 }

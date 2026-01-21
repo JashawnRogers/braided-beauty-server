@@ -1,12 +1,19 @@
 package com.braided_beauty.braided_beauty.services;
 
+import com.braided_beauty.braided_beauty.dtos.addOn.AddOnResponseDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
+import com.braided_beauty.braided_beauty.mappers.addOn.AddOnDTOMapper;
+import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationDTO;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
+import com.braided_beauty.braided_beauty.records.ConfirmationReceiptDTO;
+import com.braided_beauty.braided_beauty.records.FinalPaymentConfirmationDTO;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,18 +22,20 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @AllArgsConstructor
 public class AppointmentConfirmationService {
     private final AppointmentRepository appointmentRepository;
+    private final PaymentRepository paymentRepository;
+    private final AddOnDTOMapper addOnDTOMapper;
     private final JwtService jwtService;
     private final JwtDecoder jwtDecoder;
 
@@ -78,10 +87,6 @@ public class AppointmentConfirmationService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Confirmation link is no longer valid");
         }
 
-        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.ACCEPTED, "Payment processing");
-        }
-
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed");
         }
@@ -98,25 +103,67 @@ public class AppointmentConfirmationService {
                 );
     }
 
-    @Transactional
-    public BookingConfirmationDTO getConfirmationBySessionId(String sessionId) {
+    public ConfirmationReceiptDTO getConfirmationBySessionId(String sessionId) {
         Appointment appointment = appointmentRepository.findByStripeSessionId(sessionId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found from session: " + sessionId));
 
-        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT
-            || appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED || appointment.getBookingConfirmationJti() == null) {
-            throw new ResponseStatusException(HttpStatus.ACCEPTED, "Payment processing");
+        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Deposit payment not processed yet.");
         }
 
-        return new BookingConfirmationDTO(
+        if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
+        }
+
+        List<AddOnResponseDTO> addOns = appointment.getAddOns()
+                .stream()
+                .map(addOnDTOMapper::toDto)
+                .toList();
+
+        return new ConfirmationReceiptDTO(
                 appointment.getId(),
                 appointment.getService().getName(),
+                appointment.getService().getPrice(),
                 appointment.getAppointmentTime(),
                 appointment.getDurationMinutes(),
                 appointment.getDepositAmount(),
                 appointment.getRemainingBalance(),
-                appointment.getPaymentStatus(),
-                appointment.getRemainingBalance()
+                appointment.getTipAmount(),
+                addOns,
+                appointment.getTotalAmount()
+        );
+    }
+
+    public ConfirmationReceiptDTO getFinalConfirmationBySessionId(String sessionId) {
+        Payment finalPayment = paymentRepository.findByStripeSessionId(sessionId)
+                .orElseThrow(() -> new NotFoundException("No payment found with Stripe session ID: " + sessionId));
+
+        Appointment appointment = finalPayment.getAppointment();
+
+        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Final payment not processed yet.");
+        }
+
+        if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
+        }
+
+        List<AddOnResponseDTO> addOns = appointment.getAddOns()
+                .stream()
+                .map(addOnDTOMapper::toDto)
+                .toList();
+
+        return new ConfirmationReceiptDTO(
+                appointment.getId(),
+                appointment.getService().getName(),
+                appointment.getService().getPrice(),
+                appointment.getAppointmentTime(),
+                appointment.getDurationMinutes(),
+                appointment.getDepositAmount(),
+                appointment.getRemainingBalance(),
+                appointment.getTipAmount(),
+                addOns,
+                appointment.getTotalAmount()
         );
     }
 
@@ -175,7 +222,7 @@ public class AppointmentConfirmationService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Deposit for appointment has not been paid");
         }
 
-        BookingConfirmationDTO dto = getConfirmationBySessionId(appointment.getStripeSessionId());
+        ConfirmationReceiptDTO dto = getConfirmationBySessionId(appointment.getStripeSessionId());
 
         ZonedDateTime start = dto.appointmentTime().atZone(ZoneId.of("America/Phoenix"));
         ZonedDateTime end = start.plusMinutes(dto.durationMinutes());

@@ -10,7 +10,10 @@ import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.repositories.RefreshTokenRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -35,7 +38,9 @@ public class RefreshTokenService {
     private final JwtService jwtService;
     private final Clock clock;
 
+    public static final String COOKIE_NAME = "refreshToken";
     private static final Duration REFRESH_TTL = Duration.ofDays(14);
+    private static final Duration COOKIE_TTL = Duration.ofDays(14);
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
 
     @Transactional
@@ -111,7 +116,8 @@ public class RefreshTokenService {
                 principal.id(),
                 principal.email(),
                 principal.name(),
-                principal.authorities()
+                principal.authorities(),
+                principal.isEnabled()
         );
 
         return RotateTokensDTO.builder()
@@ -173,9 +179,33 @@ public class RefreshTokenService {
                 user.getId(),
                 user.getEmail(),
                 user.getName() != null ? user.getName() : user.getEmail(),
-                authorities
+                authorities,
+                user.getPassword(),
+                user.isEnabled()
         );
 
         return new UsernamePasswordAuthenticationToken(principal, null, authorities);
+    }
+
+    public void addRefreshCookie(HttpServletResponse res, String token) {
+        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, token)
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(COOKIE_TTL)
+                .build();
+        res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    public void clearRefreshCookie(HttpServletResponse res) {
+        ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("None")
+                .path("/")
+                .maxAge(0)
+                .build();
+        res.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }

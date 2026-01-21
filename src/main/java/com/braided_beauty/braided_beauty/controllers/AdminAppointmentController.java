@@ -33,8 +33,8 @@ public class AdminAppointmentController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/closeout-stripe")
-    public ResponseEntity<CheckoutLinkResponse> adminCompleteAppointmentStripe(AdminAppointmentRequestDTO dto) throws StripeException {
-        return ResponseEntity.ok(adminAppointmentService.adminCreateFinalPaymentViaQR(dto.getAppointmentId(), dto.getTipAmount()));
+    public ResponseEntity<CheckoutLinkResponse> adminCompleteAppointmentStripe(@RequestBody AdminAppointmentRequestDTO dto) throws StripeException {
+        return ResponseEntity.ok(adminAppointmentService.adminCreateFinalPaymentViaDebitCard(dto.getAppointmentId(), dto.getTipAmount()));
     }
 
 

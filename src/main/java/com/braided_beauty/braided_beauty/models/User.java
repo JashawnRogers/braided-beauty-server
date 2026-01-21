@@ -9,8 +9,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name="uk_user_oauth", columnNames={"oauth_subject"}),
+                @UniqueConstraint(name="uk_user_email", columnNames={"email"})
+        }
+)
 @Entity
-@Table(name = "users")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -35,11 +41,11 @@ public class User {
     @Column(name = "user_type", nullable = false)
     private UserType userType;
 
-    @Column(name = "oauth_provider", unique = true)
-    private String oAuthProvider;
+    @Column(name = "oauth_provider")
+    private String oauthProvider;
 
-    @Column(name = "oauth_subject", unique = true)
-    private String oAuthSubject;
+    @Column(name = "oauth_subject")
+    private String oauthSubject;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -50,7 +56,7 @@ public class User {
     @OneToMany(mappedBy = "user")
     private List<Appointment> appointments;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, optional = false, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, optional = true, fetch = FetchType.LAZY)
     private LoyaltyRecord loyaltyRecord;
 
     @Column(name = "stripe_customer_id")
@@ -69,5 +75,10 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    public void applyLoyaltyRecord(LoyaltyRecord lr) {
+        this.setLoyaltyRecord(lr);
+        lr.setUser(this);
     }
 }

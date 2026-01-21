@@ -132,12 +132,14 @@ public class AppointmentService {
                 .setScale(2, RoundingMode.HALF_UP);
 
         appointment.setDepositAmount(deposit);
+        appointment.setTotalAmount(total);
 
         if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
             appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
             appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
             appointment.setHoldExpiresAt(null);
             appointment.setCreatedAt(LocalDateTime.now());
+            appointment.setRemainingBalance(BigDecimal.ZERO);
             Appointment savedNoDepositRequired = appointmentRepository.save(appointment);
 
             BookingConfirmationToken confirmationToken = appointmentConfirmationService
@@ -152,21 +154,24 @@ public class AppointmentService {
             appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
             appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
             appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
+            appointment.setRemainingBalance(total.subtract(deposit).setScale(2, RoundingMode.HALF_UP));
+
+
+            appointment.setCreatedAt(LocalDateTime.now());
+
+            Appointment saved = appointmentRepository.save(appointment);
+
+            // ----- Call payment service after save -----
+            String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+            String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
+
+            Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
+
+            saved.setStripeSessionId(session.getId());
+            appointmentRepository.save(saved);
+
+            return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
         }
-
-        appointment.setCreatedAt(LocalDateTime.now());
-
-        Appointment saved = appointmentRepository.save(appointment);
-
-        // ----- Call payment service after save -----
-        String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
-        String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
-        Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
-
-        saved.setStripeSessionId(session.getId());
-        appointmentRepository.save(saved);
-
-        return new AppointmentCreateResponseDTO(saved.getId(),true ,session.getUrl(), null);
     }
 
     @Transactional

@@ -115,9 +115,9 @@ public class UserMemberDtoMapper {
                 .loyaltyPoints(user.getLoyaltyRecord().getPoints())
                 .redeemedPoints(user.getLoyaltyRecord().getRedeemedPoints())
                 .loyaltyTier(tier)
-                .oAuthProvider(user.getOAuthProvider())
-                .oAuthSubject(user.getOAuthSubject())
-                .isOAuthAccount(user.getOAuthProvider() != null)
+                .oAuthProvider(user.getOauthProvider())
+                .oAuthSubject(user.getOauthSubject())
+                .isOAuthAccount(user.getOauthProvider() != null)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

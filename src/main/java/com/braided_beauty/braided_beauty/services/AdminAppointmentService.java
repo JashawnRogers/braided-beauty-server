@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.services;
 
+import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
@@ -19,6 +20,7 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,8 +29,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class AdminAppointmentService {
@@ -38,6 +42,7 @@ public class AdminAppointmentService {
     private final AddOnRepository addOnRepository;
     private final FrontendProps frontendProps;
     private final PaymentService paymentService;
+    private final SchedulingConfig schedulingConfig;
 
     @Transactional
     public AdminAppointmentSummaryDTO adminCancelAppointment(AdminAppointmentRequestDTO dto) {
@@ -120,6 +125,8 @@ public class AdminAppointmentService {
             }
         }
 
+        // Need to adjust so that if a tip amount is decreased, it correctly updates the remaining balance
+        // And vice versa
         if (dto.getTipAmount() != null) {
             appointment.setTipAmount(dto.getTipAmount());
         }
@@ -129,10 +136,23 @@ public class AdminAppointmentService {
             appointment.setAppointmentStatus(dto.getAppointmentStatus());
         }
 
+
         if (dto.getPaymentStatus() != null
         && dto.getPaymentStatus() != appointment.getPaymentStatus()) {
             appointment.setPaymentStatus(dto.getPaymentStatus());
         }
+
+//        if (dto.getAppointmentTime() != null && appointment.getAppointmentStatus() != AppointmentStatus.COMPLETED) {
+//            int bufferMinutes = schedulingConfig.getBufferMinutes();
+//            LocalDateTime start = dto.getAppointmentTime();
+//            LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
+//
+//            if (appointmentRepository.findConflictingAppointments(start, end, bufferMinutes).stream().findAny().isPresent()) {
+//                throw new ConflictException("This time overlaps with another appointment.");
+//            }
+//
+//            appointment.setAppointmentTime(dto.getAppointmentTime());
+//        }
 
         if (dto.getAppointmentStatus() == AppointmentStatus.CANCELED) {
             if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()) {
@@ -147,11 +167,11 @@ public class AdminAppointmentService {
     }
 
     @Transactional
-    public CheckoutLinkResponse adminCreateFinalPaymentViaQR(UUID appointmentId, BigDecimal tipAmount) throws StripeException {
+    public CheckoutLinkResponse adminCreateFinalPaymentViaDebitCard(UUID appointmentId, BigDecimal tipAmount) throws StripeException {
         Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
 
-        String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+        String successUrl = frontendProps.baseUrl() + "/book/final/success?session_id={CHECKOUT_SESSION_ID}";
         String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
 
         Session session = paymentService.createFinalPaymentSession(appointment, successUrl, cancelUrl, tipAmount);

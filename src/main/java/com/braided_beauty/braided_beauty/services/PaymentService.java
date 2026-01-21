@@ -4,8 +4,7 @@ import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.Payment;
+import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
@@ -23,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.lang.String;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -70,6 +70,8 @@ public class PaymentService {
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
                 .setCustomerEmail(email)
+                .putMetadata("appointmentId", appointment.getId().toString())
+                .putMetadata("paymentType", "deposit")
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
                                 .setQuantity(1L)
@@ -118,19 +120,16 @@ public class PaymentService {
             tipAmount = BigDecimal.ZERO;
         }
 
-        BigDecimal deposit = appointment.getDepositAmount() == null ? BigDecimal.ZERO : appointment.getDepositAmount();
-        BigDecimal serviceAmount = appointment.getService().getPrice();
-        BigDecimal remainingBalance = serviceAmount.subtract(deposit);
+        BigDecimal remainingBalance = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO);
         BigDecimal finalAmount = remainingBalance.add(tipAmount);
+        appointment.setTotalAmount(appointment.getTotalAmount().add(tipAmount));
         String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
 
-        if (remainingBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Deposit exceeds service price for appointment " + appointment.getId());
+        if (remainingBalance.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("No remaining balance to pay");
         }
 
         List<SessionCreateParams.LineItem> lineItems = Stream.of(
-                // Remaining balance line item
-                remainingBalance.compareTo(BigDecimal.ZERO) > 0 ?
                 SessionCreateParams.LineItem.builder()
                         .setQuantity(1L)
                         .setPriceData(
@@ -144,8 +143,7 @@ public class PaymentService {
                                         )
                                         .build()
                         )
-                        .build()
-                : null,
+                        .build(),
 
                 // Tip amount line item (optional)
                 tipAmount.compareTo(BigDecimal.ZERO) > 0 ?
@@ -170,6 +168,8 @@ public class PaymentService {
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
                 .setCustomerEmail(email)
+                .putMetadata("appointmentId", appointment.getId().toString())
+                .putMetadata("paymentType", "final")
                 .addAllLineItem(lineItems)
                 .setPaymentIntentData(
                     SessionCreateParams.PaymentIntentData.builder()
@@ -213,17 +213,31 @@ public class PaymentService {
 
         if (paymentType == null || appointmentId == null) {
             log.warn("Missing metadata on Checkout Session {}: appointmentId/paymentType", session.getId());
-            return;
-        }
-
-        if (!"paid".equalsIgnoreCase(session.getPaymentStatus())) {
-            log.info("Checkout session {} not paid yet (status={})", session.getId(), session.getPaymentStatus());
-            return;
+            throw new IllegalStateException("payment type cannot be null: " + paymentType + ". appointmentId: " + appointmentId);
         }
 
         Appointment appointment = appointmentRepository.findById(UUID.fromString(appointmentId))
                 .orElseThrow(() -> new NotFoundException("Appointment not found: " + appointmentId));
 
+        List<AddOn> addOns = appointment.getAddOns();
+        ServiceModel service = appointment.getService();
+
+        BigDecimal addOnsTotal = addOns.stream()
+                .map(AddOn::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal total = addOnsTotal
+                .add(service.getPrice())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal deposit = total
+                .multiply(new BigDecimal("0.20"))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal remainingBalance = total.subtract(deposit).setScale(2, RoundingMode.HALF_UP);
+
+        log.info("Payment Type: {}", paymentType);
         if ("deposit".equals(paymentType) && appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
             log.info("Deposit already processed for appointment {}", appointmentId);
             return;
@@ -232,43 +246,57 @@ public class PaymentService {
         Payment payment = paymentRepository.findByStripeSessionId(session.getId())
                 .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
 
-        if ("deposit".equals(paymentType)) {
-            payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
-            paymentRepository.save(payment);
-            appointment.setStripeSessionId(session.getId());
-            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
-            appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
-            appointment.setHoldExpiresAt(null);
-            Appointment saved = appointmentRepository.save(appointment);
+        try {
+            switch (payment.getPaymentType()) {
+                case DEPOSIT ->  {
+                    payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+                    paymentRepository.save(payment);
+                    appointment.setStripeSessionId(session.getId());
+                    appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+                    appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+                    appointment.setHoldExpiresAt(null);
+                    appointment.setRemainingBalance(remainingBalance);
+                    appointment.setLoyaltyApplied(false);
+                    Appointment saved = appointmentRepository.save(appointment);
 
-            appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
+                    appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
+                    log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
+                    return;
+                }
+                case FINAL -> {
+                    payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
+                    paymentRepository.save(payment);
 
-            log.info("Deposit completed via paymentIntent {} for appointment {}", session.getPaymentIntent(), appointmentId);
-            return;
-        }
+                    appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
+                    appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
+                    appointment.setRemainingBalance(BigDecimal.ZERO);
 
-        if ("final".equals(paymentType)) {
-            payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
-            paymentRepository.save(payment);
+                    if (appointment.getUser() == null) {
+                        log.info("Skipping loyalty reward (guest appointment {}", appointmentId);
+                    } else if (!appointment.isLoyaltyApplied()) {
+                        if (appointment.getUser().getLoyaltyRecord() == null) {
+                            loyaltyService.attachLoyaltyRecord(appointment.getUser().getId());
+                        }
+                        loyaltyService.awardForCompletedAppointment(appointment.getUser().getId());
+                        appointment.setLoyaltyApplied(true);
+                    }
 
-            appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-            appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
-
-            if (!appointment.isLoyaltyApplied()) {
-                loyaltyService.awardForCompletedAppointment(appointment.getUser());
-                appointment.setLoyaltyApplied(true);
+                    appointmentRepository.save(appointment);
+                    log.info("Final payment completed via session: {} for appointment: {}", session.getId(), appointmentId);
+                    return;
+                }
             }
-            appointmentRepository.save(appointment);
-
-            log.info("Final payment completed via paymentIntent {} for appointment {}", session.getPaymentIntent(), appointmentId);
-            return;
+        } catch (Exception e) {
+            log.error("FINAL webhook processing failed. sessionId={} apptId={} msg={}",
+                    session.getId(), appointmentId, e.getMessage(), e);
+            throw e;
         }
 
         log.warn("Unknown paymentType {} on paymentIntent {}", paymentType, session.getPaymentIntent());
     }
 
     @Transactional
-    public void handlePaymentIntentFailed(Session session) {
+    public void handleCheckoutSessionFailed(Session session) {
         String appointmentId = session.getMetadata().get("appointmentId");
         String paymentType = session.getMetadata().get("paymentType");
 

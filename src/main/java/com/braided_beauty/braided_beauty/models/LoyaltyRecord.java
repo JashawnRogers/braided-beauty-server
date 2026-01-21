@@ -35,6 +35,9 @@ public class LoyaltyRecord {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
     @Column(name = "enabled")
     private Boolean enabled = true;
 
@@ -43,15 +46,6 @@ public class LoyaltyRecord {
 
     @Version
     private long version;
-
-    public LoyaltyRecord(User user) {
-        this.user = user;
-        this.points = 0;
-        this.redeemedPoints = 0;
-        this.signupBonusAwarded = false;
-        this.enabled = true;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     public void addPoints(int amount) {
         if (amount < 0) throw new IllegalArgumentException("Points must be positive");

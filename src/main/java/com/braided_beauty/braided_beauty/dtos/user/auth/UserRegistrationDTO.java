@@ -11,7 +11,7 @@ import lombok.Setter;
 @Setter
 public class UserRegistrationDTO {
     @NotBlank(message = "Must provide email to register")
-    @Email
+    @Email(message = "Email should be valid")
     public String email;
 
     @NotBlank(message = "Must provide password to login")
