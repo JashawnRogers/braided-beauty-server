@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.presign.PresignPutResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.presign.PresignUploadRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadResponseDTO;
+import com.braided_beauty.braided_beauty.records.S3Properties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -34,13 +35,13 @@ public class MediaService {
     public MediaService(
             S3Client s3Client,
             S3Presigner s3Presigner,
-            @Value("${aws.bucket.name}") String bucket,
+            S3Properties S3props,
             @Value("${app.media.maxImageBytes}") long maxImageBytes,
             @Value("${app.media.maxVideoBytes}") long maxVideoBytes
     ) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
-        this.bucket = bucket;
+        this.bucket = S3props.bucketName();
         this.maxImageBytes = maxImageBytes;
         this.maxVideoBytes = maxVideoBytes;
     }

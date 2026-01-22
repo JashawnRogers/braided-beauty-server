@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.controllers;
 
 
 
+import com.braided_beauty.braided_beauty.records.StripeProperties;
 import com.braided_beauty.braided_beauty.services.PaymentService;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
@@ -12,6 +13,7 @@ import com.stripe.exception.SignatureVerificationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +21,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/webhook/stripe")
+@EnableConfigurationProperties(StripeProperties.class)
 public class StripeWebhookController {
 
 
@@ -27,9 +30,9 @@ public class StripeWebhookController {
     private final String webhookSecret;
     private final PaymentService paymentService;
 
-    public StripeWebhookController(@Value("${stripe.webhook.secret}") String webhookSecret,
+    public StripeWebhookController(StripeProperties props,
                                    PaymentService paymentService) {
-        this.webhookSecret = webhookSecret;
+        this.webhookSecret = props.webhookSecret();
         this.paymentService = paymentService;
     }
 
