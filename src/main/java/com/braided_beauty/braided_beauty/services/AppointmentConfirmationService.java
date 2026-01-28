@@ -5,13 +5,11 @@ import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.addOn.AddOnDTOMapper;
-import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationDTO;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.ConfirmationReceiptDTO;
-import com.braided_beauty.braided_beauty.records.FinalPaymentConfirmationDTO;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import jakarta.transaction.Transactional;
@@ -107,9 +105,7 @@ public class AppointmentConfirmationService {
         Appointment appointment = appointmentRepository.findByStripeSessionId(sessionId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found from session: " + sessionId));
 
-        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Deposit payment not processed yet.");
-        }
+
 
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");

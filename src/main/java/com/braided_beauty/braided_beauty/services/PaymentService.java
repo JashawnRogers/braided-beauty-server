@@ -23,7 +23,9 @@ import org.springframework.stereotype.Service;
 import java.lang.String;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -36,6 +38,8 @@ public class PaymentService {
     private final AppointmentRepository appointmentRepository;
     private final LoyaltyService loyaltyService;
     private final AppointmentConfirmationService appointmentConfirmationService;
+    private final EmailTemplateService emailTemplateService;
+    private final EmailService emailService;
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     @Transactional
@@ -237,6 +241,8 @@ public class PaymentService {
 
         BigDecimal remainingBalance = total.subtract(deposit).setScale(2, RoundingMode.HALF_UP);
 
+        String email = appointment.getUser().getEmail() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+
         log.info("Payment Type: {}", paymentType);
         if ("deposit".equals(paymentType) && appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
             log.info("Deposit already processed for appointment {}", appointmentId);
@@ -258,6 +264,21 @@ public class PaymentService {
                     appointment.setRemainingBalance(remainingBalance);
                     appointment.setLoyaltyApplied(false);
                     Appointment saved = appointmentRepository.save(appointment);
+
+                    DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm a");
+                    String formattedAptTime = timeFormatter.format(appointment.getAppointmentTime());
+
+                    Map<String, Object> model = Map.of(
+                            "customerName", appointment.getUser().getName() != null ? appointment.getUser().getName() : "Guest",
+                            "appointmentDateTime", formattedAptTime,
+                            "serviceName", appointment.getService().getName(),
+                            "depositAmount", appointment.getDepositAmount(),
+                            "remainingAmount", remainingBalance,
+                            "businessPhone", "123-456-7890",
+                            "businessAddress", "123 Main Street, Phoenix AZ, 85004"
+                            );
+                    String html = emailTemplateService.render("deposit-receipt", model);
+                    emailService.sendHtmlEmail(email, "Deposit confirmation", html);
 
                     appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
                     log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
