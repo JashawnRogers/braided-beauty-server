@@ -21,7 +21,7 @@ public class AdminLoyaltySettingsController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping
+    @PatchMapping
     public ResponseEntity<LoyaltySettingsDTO> updateSettings(
             @Valid @RequestBody LoyaltySettingsDTO dto) {
         return ResponseEntity.ok(service.updateSettings(dto));
