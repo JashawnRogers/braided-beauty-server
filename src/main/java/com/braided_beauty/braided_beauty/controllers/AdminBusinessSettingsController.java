@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin/business/settings")
 @AllArgsConstructor
-public class BusinessSettingsController {
+public class AdminBusinessSettingsController {
     private final BusinessSettingsService service;
 
     @GetMapping

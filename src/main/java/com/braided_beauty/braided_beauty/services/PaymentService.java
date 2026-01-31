@@ -6,6 +6,7 @@ import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
+import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.stripe.exception.StripeException;
@@ -24,10 +25,7 @@ import java.lang.String;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
 
 @AllArgsConstructor
@@ -252,6 +250,20 @@ public class PaymentService {
         Payment payment = paymentRepository.findByStripeSessionId(session.getId())
                 .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
 
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm a");
+        String formattedAptTime = timeFormatter.format(appointment.getAppointmentTime());
+        List<EmailAddOnLine> addOnLines = appointment.getAddOns().stream()
+                .map(a -> new EmailAddOnLine(a.getName(), a.getPrice().toString()))
+                .toList();
+
+        Map<String, Object> base = new HashMap<>();
+        base.put("customerName", appointment.getUser().getName() != null ? appointment.getUser().getName() : "Guest");
+        base.put("appointmentDateTime", formattedAptTime);
+        base.put("serviceName", appointment.getService().getName());
+        base.put("depositAmount", appointment.getDepositAmount().toString());
+        base.put("businessPhone", "123-456-7890");
+        base.put("businessAddress","123 Main Street, Phoenix AZ, 85004");
+
         try {
             switch (payment.getPaymentType()) {
                 case DEPOSIT ->  {
@@ -265,19 +277,10 @@ public class PaymentService {
                     appointment.setLoyaltyApplied(false);
                     Appointment saved = appointmentRepository.save(appointment);
 
-                    DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm a");
-                    String formattedAptTime = timeFormatter.format(appointment.getAppointmentTime());
+                    Map<String, Object> depositModel = new HashMap<>(base);
+                    depositModel.put("remainingAmount", remainingBalance);
 
-                    Map<String, Object> model = Map.of(
-                            "customerName", appointment.getUser().getName() != null ? appointment.getUser().getName() : "Guest",
-                            "appointmentDateTime", formattedAptTime,
-                            "serviceName", appointment.getService().getName(),
-                            "depositAmount", appointment.getDepositAmount(),
-                            "remainingAmount", remainingBalance,
-                            "businessPhone", "123-456-7890",
-                            "businessAddress", "123 Main Street, Phoenix AZ, 85004"
-                            );
-                    String html = emailTemplateService.render("deposit-receipt", model);
+                    String html = emailTemplateService.render("deposit-receipt", depositModel);
                     emailService.sendHtmlEmail(email, "Deposit confirmation", html);
 
                     appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
@@ -303,6 +306,21 @@ public class PaymentService {
                     }
 
                     appointmentRepository.save(appointment);
+
+                    Map<String, Object> finalModel = new HashMap<>(base);
+                    finalModel.put("serviceAmount", appointment.getService().getPrice());
+                    finalModel.put("addOns", addOnLines);
+                    finalModel.put("addOnsTotal", addOnsTotal);
+                    finalModel.put("discountAmount", "0.00");
+                    finalModel.put("paidToday", appointment.getTotalAmount().subtract(appointment.getDepositAmount()));
+                    finalModel.put("totalPaid", appointment.getTotalAmount());
+                    if (appointment.getTipAmount() != null) {
+                        finalModel.put("tipAmount", appointment.getTipAmount());
+                    }
+
+                    String html = emailTemplateService.render("final-payment-receipt", finalModel);
+                    emailService.sendHtmlEmail(email, "Final Payment Received", html);
+
                     log.info("Final payment completed via session: {} for appointment: {}", session.getId(), appointmentId);
                     return;
                 }
@@ -336,7 +354,6 @@ public class PaymentService {
 
         payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
         paymentRepository.save(payment);
-
 
         appointment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
         appointment.setHoldExpiresAt(null);

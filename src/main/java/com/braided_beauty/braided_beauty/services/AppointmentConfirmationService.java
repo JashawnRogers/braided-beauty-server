@@ -105,8 +105,6 @@ public class AppointmentConfirmationService {
         Appointment appointment = appointmentRepository.findByStripeSessionId(sessionId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found from session: " + sessionId));
 
-
-
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
         }
@@ -135,10 +133,6 @@ public class AppointmentConfirmationService {
                 .orElseThrow(() -> new NotFoundException("No payment found with Stripe session ID: " + sessionId));
 
         Appointment appointment = finalPayment.getAppointment();
-
-        if (appointment.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Final payment not processed yet.");
-        }
 
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
