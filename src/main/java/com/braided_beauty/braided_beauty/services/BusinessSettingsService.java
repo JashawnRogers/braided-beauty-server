@@ -38,7 +38,6 @@ public class BusinessSettingsService {
 
         BusinessSettings saved = repository.save(settings);
         return BusinessSettingsDTO.builder()
-                .id(saved.getId())
                 .appointmentBufferTime(saved.getAppointmentBufferTime())
                 .companyAddress(saved.getCompanyAddress())
                 .companyEmail(saved.getCompanyEmail())
@@ -50,7 +49,6 @@ public class BusinessSettingsService {
         BusinessSettings settings = getOrCreate();
 
         return BusinessSettingsDTO.builder()
-                .id(settings.getId())
                 .appointmentBufferTime(settings.getAppointmentBufferTime())
                 .companyAddress(settings.getCompanyAddress())
                 .companyEmail(settings.getCompanyEmail())

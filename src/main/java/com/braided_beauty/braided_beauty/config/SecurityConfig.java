@@ -83,6 +83,7 @@ public class SecurityConfig {
                                 "/api/v1/appointments/confirm/by-session",
                                 "/api/v1/appointments/confirm/ics",
                                 "/api/v1/appointments/confirm/ics/by-session",
+                                "/api/v1/business/**",
                                 "/api/v1/email/**",
                                 "/error"
                         ).permitAll()

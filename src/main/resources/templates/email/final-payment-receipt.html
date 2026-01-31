@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      lang="en"
+      th:replace="email/_layout :: layout(~{::content})">
+
+<div th:fragment="content">
+
+    <h3 style="margin:0 0 12px 0; font-size:18px;">Thank you for choosing Braided Beauty!</h3>
+
+    <p style="margin:0 0 12px 0;">
+        Hi <strong th:text="${customerName}">Customer</strong>,
+    </p>
+
+    <p style="margin:0 0 12px 0;">
+        Here is your receipt for your completed appointment on
+        <strong th:text="${appointmentDateTime}">Jan 31, 2:00 PM</strong>.
+    </p>
+
+    <!-- Service summary -->
+    <table cellpadding="0" cellspacing="0" border="0"
+           style="margin-top:12px; border-collapse:collapse;">
+        <tr>
+            <td style="padding-bottom:4px;">Service:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${serviceName}">Knotless Braids</strong>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding-bottom:4px;">Base service amount:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${serviceAmount}">$100.00</strong>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Add-ons (dynamic rows) -->
+    <div th:if="${addOns != null and !#lists.isEmpty(addOns)}"
+         style="margin-top:12px;">
+        <p style="margin:0 0 8px 0; font-weight:bold;">Add-ons</p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="width:100%; border-collapse:collapse;">
+            <tr>
+                <th align="left" style="padding:6px 0; font-size:14px; border-bottom:1px solid #eee;">
+                    Add-on
+                </th>
+                <th align="right" style="padding:6px 0; font-size:14px; border-bottom:1px solid #eee;">
+                    Price
+                </th>
+            </tr>
+
+            <tr th:each="a : ${addOns}">
+                <td style="padding:6px 0; font-size:14px;" th:text="${a.name}">Edge Up</td>
+                <td align="right" style="padding:6px 0; font-size:14px;" th:text="${a.price}">$10.00</td>
+            </tr>
+
+            <tr>
+                <td style="padding-top:8px; font-size:14px; border-top:1px solid #eee;">
+                    <strong>Add-ons total</strong>
+                </td>
+                <td align="right" style="padding-top:8px; font-size:14px; border-top:1px solid #eee;">
+                    <strong th:text="${addOnsTotal}">$20.00</strong>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Totals -->
+    <table cellpadding="0" cellspacing="0" border="0"
+           style="margin-top:12px; border-collapse:collapse;">
+        <tr th:if="${tipAmount != null}">
+            <td style="padding-bottom:4px;">Tip:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${tipAmount}">$0.00</strong>
+            </td>
+        </tr>
+
+        <tr th:if="${discountAmount != null}">
+            <td style="padding-bottom:4px;">Discount:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${discountAmount}">-$10.00</strong>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding-bottom:4px;">Deposit paid:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${depositAmount}">$25.00</strong>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding-bottom:4px;">Final payment:</td>
+            <td style="padding-left:8px;">
+                <strong th:text="${paidToday}">$75.00</strong>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding-top:8px;"><strong>Total paid:</strong></td>
+            <td style="padding-left:8px; padding-top:8px;">
+                <strong th:text="${totalPaid}">$100.00</strong>
+            </td>
+        </tr>
+    </table>
+
+</div>
+</html>

@@ -11,6 +11,6 @@ public class PhoneValidator implements ConstraintValidator<PhoneConstraint, Stri
     @Override
     public boolean isValid(String value, ConstraintValidatorContext ctx) {
         if (value == null || value.trim().isEmpty()) return optional;
-        return PhoneNormalizer.toE164(value) != null;
+        return PhoneNormalizer.toE164(value).isPresent();
     }
 }
