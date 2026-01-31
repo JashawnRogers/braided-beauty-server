@@ -1,29 +1,56 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org">
-<body style="margin:0; padding:0; background-color:#f6f6f6;" th:fragment="layout(content)">
+<body style="margin:0; padding:0; background-color:#f6f6f6;"
+      th:fragment="layout(content)">
+
+<!-- Full width wrapper -->
 <table width="100%" cellpadding="0" cellspacing="0" border="0"
        style="width:100%; background-color:#f6f6f6; border-collapse:collapse;">
     <tr>
-        <td align="center" style="padding:24px 0;">
+        <td align="center" style="padding:24px 12px;">
+
+            <!-- Container: fixed width with mobile-friendly max-width -->
             <table width="600" cellpadding="0" cellspacing="0" border="0"
-                   style="width:600px; background-color:#ffffff; border-collapse:collapse;">
+                   style="width:600px; max-width:600px; background-color:#ffffff; border-collapse:collapse;">
                 <tr>
-                    <td style="padding:24px; font-family:Arial, sans-serif;">
+                    <td style="padding:24px; font-family:Arial, sans-serif; color:#111111;">
+
                         <!-- Header -->
-                        <h2 style="margin:0 0 16px 0; font-size:22px;">Braided Beauty</h2>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                               style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="padding-bottom:12px;">
+                                    <h2 style="margin:0; font-size:22px; line-height:1.2;">Braided Beauty</h2>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="border-top:1px solid #eeeeee; padding-top:16px;"></td>
+                            </tr>
+                        </table>
 
                         <!-- Content slot -->
-                        <div th:replace="${content}"></div>
+                        <div style="margin:0;">
+                            <div th:replace="${content}"></div>
+                        </div>
 
                         <!-- Footer -->
-                        <div style="margin-top:24px; font-size:12px; color:#777;">
-                            <div th:text="${businessAddress}">123 Main St</div>
-                            <div th:text="${businessPhone}">(555) 555-5555</div>
-                        </div>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                               style="width:100%; border-collapse:collapse; margin-top:20px;">
+                            <tr>
+                                <td style="border-top:1px solid #eeeeee; padding-top:16px;"></td>
+                            </tr>
+                            <tr>
+                                <td style="padding-top:10px; font-size:12px; line-height:1.5; color:#777777;">
+                                    <div th:text="${businessAddress}">123 Main St</div>
+                                    <div th:text="${businessPhone}">(555) 555-5555</div>
+                                </td>
+                            </tr>
+                        </table>
 
                     </td>
                 </tr>
             </table>
+
         </td>
     </tr>
 </table>

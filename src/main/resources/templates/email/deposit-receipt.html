@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      lang="en"
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
       th:replace="email/_layout :: layout(~{::content})">
 
 <div th:fragment="content">
@@ -11,31 +10,55 @@
     Hi <strong th:text="${customerName}">Customer</strong>,
   </p>
 
-  <p style="margin:0 0 12px 0;">
+  <p style="margin:0 0 16px 0;">
     We received your deposit for your appointment on
-    <strong th:text="${appointmentDateTime}">Jan 31, 2:00 PM</strong>.
+    <strong th:text="${#temporals.format(appointmentDateTime, 'MMM d, yyyy h:mm a')}">
+      Jan 31, 2026 2:00 PM
+    </strong>.
   </p>
 
-  <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px; border-collapse:collapse;">
+  <!-- Summary -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="width:100%; border-collapse:collapse; margin-top:12px;">
     <tr>
-      <td style="padding-bottom:4px;">Service:</td>
-      <td style="padding-left:8px;">
+      <td style="padding:6px 0; font-size:14px;">Service</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
         <strong th:text="${serviceName}">Knotless Braids</strong>
       </td>
     </tr>
+
     <tr>
-      <td style="padding-bottom:4px;">Deposit paid:</td>
-      <td style="padding-left:8px;">
-        <strong th:text="${depositAmount}">$25.00</strong>
+      <td style="padding:6px 0; font-size:14px;">Deposit paid</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${'$' + #numbers.formatDecimal(depositAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
       </td>
     </tr>
+
     <tr>
-      <td>Remaining balance:</td>
-      <td style="padding-left:8px;">
-        <strong th:text="${remainingAmount}">$75.00</strong>
+      <td style="padding:6px 0; font-size:14px;">Remaining balance</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${'$' + #numbers.formatDecimal(remainingAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
       </td>
     </tr>
   </table>
+
+  <!-- Preparation / policy -->
+  <div style="margin-top:18px; padding-top:14px; border-top:1px solid #eee;">
+    <p style="margin:0 0 10px 0; font-weight:bold;">Before your appointment</p>
+
+    <ul style="margin:0; padding-left:18px;">
+      <li style="margin:0 0 8px 0; font-size:14px; line-height:1.4;">
+        Please arrive with your hair <strong>washed and blow-dried</strong>.
+      </li>
+      <li style="margin:0 0 8px 0; font-size:14px; line-height:1.4;">
+        There is a <strong>10-minute grace period</strong>. After that, a late fee may apply.
+      </li>
+    </ul>
+
+    <p style="margin:12px 0 0 0; font-size:14px; line-height:1.4;">
+      If you have any questions, just reply to this email.
+    </p>
+  </div>
 
 </div>
 </html>

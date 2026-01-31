@@ -5,12 +5,11 @@ import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
-import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
+import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
 import com.stripe.exception.StripeException;
-import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.RefundCreateParams;
@@ -38,6 +37,8 @@ public class PaymentService {
     private final AppointmentConfirmationService appointmentConfirmationService;
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
+    private final BusinessSettingsService businessSettingsService;
+
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     @Transactional
@@ -240,6 +241,8 @@ public class PaymentService {
         BigDecimal remainingBalance = total.subtract(deposit).setScale(2, RoundingMode.HALF_UP);
 
         String email = appointment.getUser().getEmail() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        BusinessSettings settings = businessSettingsService.getOrCreate();
+        String companyPhoneNumber  = PhoneNormalizer.formatForEmail(settings.getCompanyPhoneNumber());
 
         log.info("Payment Type: {}", paymentType);
         if ("deposit".equals(paymentType) && appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
@@ -250,19 +253,17 @@ public class PaymentService {
         Payment payment = paymentRepository.findByStripeSessionId(session.getId())
                 .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
 
-        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm a");
-        String formattedAptTime = timeFormatter.format(appointment.getAppointmentTime());
         List<EmailAddOnLine> addOnLines = appointment.getAddOns().stream()
                 .map(a -> new EmailAddOnLine(a.getName(), a.getPrice().toString()))
                 .toList();
 
         Map<String, Object> base = new HashMap<>();
         base.put("customerName", appointment.getUser().getName() != null ? appointment.getUser().getName() : "Guest");
-        base.put("appointmentDateTime", formattedAptTime);
+        base.put("appointmentDateTime", appointment.getAppointmentTime());
         base.put("serviceName", appointment.getService().getName());
-        base.put("depositAmount", appointment.getDepositAmount().toString());
-        base.put("businessPhone", "123-456-7890");
-        base.put("businessAddress","123 Main Street, Phoenix AZ, 85004");
+        base.put("depositAmount", appointment.getDepositAmount());
+        base.put("businessPhone", companyPhoneNumber);
+        base.put("businessAddress",settings.getCompanyAddress());
 
         try {
             switch (payment.getPaymentType()) {
@@ -310,9 +311,9 @@ public class PaymentService {
                     Map<String, Object> finalModel = new HashMap<>(base);
                     finalModel.put("serviceAmount", appointment.getService().getPrice());
                     finalModel.put("addOns", addOnLines);
-                    finalModel.put("addOnsTotal", addOnsTotal);
-                    finalModel.put("discountAmount", "0.00");
-                    finalModel.put("paidToday", appointment.getTotalAmount().subtract(appointment.getDepositAmount()));
+                    finalModel.put("subtotal", addOnsTotal.add(service.getPrice()));
+                    finalModel.put("discountAmount", BigDecimal.ZERO);
+                    finalModel.put("chargedToday", appointment.getTotalAmount().subtract(appointment.getDepositAmount()));
                     finalModel.put("totalPaid", appointment.getTotalAmount());
                     if (appointment.getTipAmount() != null) {
                         finalModel.put("tipAmount", appointment.getTipAmount());

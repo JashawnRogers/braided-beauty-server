@@ -1,105 +1,103 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      lang="en"
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
       th:replace="email/_layout :: layout(~{::content})">
 
 <div th:fragment="content">
 
-    <h3 style="margin:0 0 12px 0; font-size:18px;">Thank you for choosing Braided Beauty!</h3>
+    <h3 style="margin:0 0 12px 0; font-size:18px;">Final Payment Received</h3>
 
     <p style="margin:0 0 12px 0;">
         Hi <strong th:text="${customerName}">Customer</strong>,
     </p>
 
-    <p style="margin:0 0 12px 0;">
-        Here is your receipt for your completed appointment on
-        <strong th:text="${appointmentDateTime}">Jan 31, 2:00 PM</strong>.
+    <p style="margin:0 0 16px 0;">
+        Thanks again — here’s your receipt for
+        <strong th:text="${#temporals.format(appointmentDateTime, 'MMM d, yyyy h:mm a')}">Jan 31, 2026 2:00 PM</strong>.
     </p>
 
-    <!-- Service summary -->
-    <table cellpadding="0" cellspacing="0" border="0"
-           style="margin-top:12px; border-collapse:collapse;">
+    <!-- Line items -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="width:100%; border-collapse:collapse; margin-top:12px;">
         <tr>
-            <td style="padding-bottom:4px;">Service:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${serviceName}">Knotless Braids</strong>
-            </td>
+            <th align="left" style="padding:8px 0; font-size:13px; border-bottom:1px solid #eee;">
+                Item
+            </th>
+            <th align="right" style="padding:8px 0; font-size:13px; border-bottom:1px solid #eee;">
+                Amount
+            </th>
         </tr>
+
+        <!-- Service -->
         <tr>
-            <td style="padding-bottom:4px;">Base service amount:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${serviceAmount}">$100.00</strong>
+            <td style="padding:8px 0; font-size:14px;">
+                <strong th:text="${serviceName}">Service</strong>
             </td>
-        </tr>
-    </table>
-
-    <!-- Add-ons (dynamic rows) -->
-    <div th:if="${addOns != null and !#lists.isEmpty(addOns)}"
-         style="margin-top:12px;">
-        <p style="margin:0 0 8px 0; font-weight:bold;">Add-ons</p>
-
-        <table width="100%" cellpadding="0" cellspacing="0" border="0"
-               style="width:100%; border-collapse:collapse;">
-            <tr>
-                <th align="left" style="padding:6px 0; font-size:14px; border-bottom:1px solid #eee;">
-                    Add-on
-                </th>
-                <th align="right" style="padding:6px 0; font-size:14px; border-bottom:1px solid #eee;">
-                    Price
-                </th>
-            </tr>
-
-            <tr th:each="a : ${addOns}">
-                <td style="padding:6px 0; font-size:14px;" th:text="${a.name}">Edge Up</td>
-                <td align="right" style="padding:6px 0; font-size:14px;" th:text="${a.price}">$10.00</td>
-            </tr>
-
-            <tr>
-                <td style="padding-top:8px; font-size:14px; border-top:1px solid #eee;">
-                    <strong>Add-ons total</strong>
-                </td>
-                <td align="right" style="padding-top:8px; font-size:14px; border-top:1px solid #eee;">
-                    <strong th:text="${addOnsTotal}">$20.00</strong>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <!-- Totals -->
-    <table cellpadding="0" cellspacing="0" border="0"
-           style="margin-top:12px; border-collapse:collapse;">
-        <tr th:if="${tipAmount != null}">
-            <td style="padding-bottom:4px;">Tip:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${tipAmount}">$0.00</strong>
+            <td align="right" style="padding:8px 0; font-size:14px;">
+                <span th:text="${'$' + #numbers.formatDecimal(serviceAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
 
-        <tr th:if="${discountAmount != null}">
-            <td style="padding-bottom:4px;">Discount:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${discountAmount}">-$10.00</strong>
+        <!-- Add-ons -->
+        <tr th:each="a : ${addOns}" th:if="${addOns != null and !#lists.isEmpty(addOns)}">
+            <td style="padding:6px 0; font-size:14px; color:#333;">
+                + <span th:text="${a.name}">Add-on</span>
+            </td>
+            <td align="right" style="padding:6px 0; font-size:14px; color:#333;">
+                <span th:text="${'$' + #numbers.formatDecimal(a.price, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
 
+        <!-- Divider -->
         <tr>
-            <td style="padding-bottom:4px;">Deposit paid:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${depositAmount}">$25.00</strong>
+            <td colspan="2" style="padding-top:10px; border-top:1px solid #eee;"></td>
+        </tr>
+
+        <!-- Summary rows -->
+        <tr>
+            <td style="padding:6px 0; font-size:14px;">Subtotal</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <span th:text="${'$' + #numbers.formatDecimal(subtotal, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
 
-        <tr>
-            <td style="padding-bottom:4px;">Final payment:</td>
-            <td style="padding-left:8px;">
-                <strong th:text="${paidToday}">$75.00</strong>
+        <tr th:if="${discountAmount != null and discountAmount.signum() != 0}">
+            <td style="padding:6px 0; font-size:14px;">Discount</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                -<span th:text="${'$' + #numbers.formatDecimal(discountAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
 
+        <tr th:if="${depositAmount != null and depositAmount.signum() != 0}">
+            <td style="padding:6px 0; font-size:14px;">Deposit paid earlier</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                -<span th:text="${'$' + #numbers.formatDecimal(depositAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
+            </td>
+        </tr>
+
+        <tr th:if="${tipAmount != null and tipAmount.signum() != 0}">
+            <td style="padding:6px 0; font-size:14px;">Tip</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <span th:text="${'$' + #numbers.formatDecimal(tipAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
+            </td>
+        </tr>
+
+        <!-- Charged today -->
         <tr>
-            <td style="padding-top:8px;"><strong>Total paid:</strong></td>
-            <td style="padding-left:8px; padding-top:8px;">
-                <strong th:text="${totalPaid}">$100.00</strong>
+            <td style="padding:10px 0 6px 0; font-size:15px;">
+                <strong>Charged today</strong>
+            </td>
+            <td align="right" style="padding:10px 0 6px 0; font-size:15px;">
+                <strong th:text="${'$' + #numbers.formatDecimal(chargedToday, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
+            </td>
+        </tr>
+
+        <!-- Total paid -->
+        <tr>
+            <td style="padding:6px 0; font-size:14px; color:#555;">
+                Total paid (deposit + today)
+            </td>
+            <td align="right" style="padding:6px 0; font-size:14px; color:#555;">
+                <span th:text="${'$' + #numbers.formatDecimal(totalPaid, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
     </table>

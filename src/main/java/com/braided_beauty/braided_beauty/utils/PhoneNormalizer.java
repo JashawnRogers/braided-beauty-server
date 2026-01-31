@@ -21,4 +21,36 @@ public final class PhoneNormalizer {
 
         throw new IllegalArgumentException("Invalid phone number");
     }
+
+    /**
+     * Formats an E.164 number for email display.
+     * Examples:
+     *  +16021234567 -> (602) 123-4567
+     *  16021234567  -> (602) 123-4567
+     *  6021234567   -> (602) 123-4567
+     *
+     * If it's not a US 10-digit number, it returns the original sanitized value.
+     */
+    public static String formatForEmail(String e164OrMessy) {
+        if (e164OrMessy == null || e164OrMessy.isBlank()) return "";
+
+        // keep digits only
+        String digits = e164OrMessy.replaceAll("\\D", "");
+
+        // handle +1XXXXXXXXXX or 1XXXXXXXXXX
+        if (digits.length() == 11 && digits.startsWith("1")) {
+            digits = digits.substring(1);
+        }
+
+        // if we have 10 digits, format as (xxx) xxx-xxxx
+        if (digits.length() == 10) {
+            String area = digits.substring(0, 3);
+            String prefix = digits.substring(3, 6);
+            String line = digits.substring(6);
+            return "(" + area + ") " + prefix + "-" + line;
+        }
+
+        // fallback: return something readable
+        return e164OrMessy.trim();
+    }
 }
