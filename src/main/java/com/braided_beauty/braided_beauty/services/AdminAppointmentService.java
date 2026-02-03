@@ -1,6 +1,5 @@
 package com.braided_beauty.braided_beauty.services;
 
-import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
@@ -10,6 +9,7 @@ import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.BusinessSettings;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
@@ -29,7 +29,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -42,7 +41,7 @@ public class AdminAppointmentService {
     private final AddOnRepository addOnRepository;
     private final FrontendProps frontendProps;
     private final PaymentService paymentService;
-    private final SchedulingConfig schedulingConfig;
+//    private final BusinessSettingsService businessSettingsService;
 
     @Transactional
     public AdminAppointmentSummaryDTO adminCancelAppointment(AdminAppointmentRequestDTO dto) {
@@ -143,7 +142,7 @@ public class AdminAppointmentService {
         }
 
 //        if (dto.getAppointmentTime() != null && appointment.getAppointmentStatus() != AppointmentStatus.COMPLETED) {
-//            int bufferMinutes = schedulingConfig.getBufferMinutes();
+//            int bufferMinutes = businessSettings.getBufferMinutes();
 //            LocalDateTime start = dto.getAppointmentTime();
 //            LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
 //

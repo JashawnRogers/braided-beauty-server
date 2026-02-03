@@ -1,11 +1,8 @@
 package com.braided_beauty.braided_beauty.services;
 
-import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.timeSlots.AvailableTimeSlotsDTO;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.BusinessHours;
-import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.BusinessHoursRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
@@ -15,9 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -25,69 +20,89 @@ public class AvailabilityService {
     private final ServiceRepository serviceRepository;
     private final BusinessHoursRepository businessHoursRepository;
     private final AppointmentRepository appointmentRepository;
-    private final SchedulingConfig schedulingConfig;
+    private final BusinessSettingsService businessSettingsService;
+    private final AddOnService addOnService;
 
 
-    public List<AvailableTimeSlotsDTO> getAvailability(UUID serviceId, LocalDate date) {
+    public List<AvailableTimeSlotsDTO> getAvailability(UUID serviceId, LocalDate date, List<UUID> addOnIds) {
         ServiceModel service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found with ID: " + serviceId));
 
-        DayOfWeek dayOfWeek = date.getDayOfWeek();
-        BusinessHours workingDay = businessHoursRepository.findByDayOfWeek(dayOfWeek)
-                .orElseThrow(() -> new NotFoundException("No business hours set for " + dayOfWeek));
+        BusinessHours workingDay = businessHoursRepository.findByDayOfWeek(date.getDayOfWeek())
+                .orElseThrow(() -> new NotFoundException("No business hours set for " + date.getDayOfWeek()));
 
-        if (workingDay.isClosed()) {
-            return List.of();
+        if (workingDay.isClosed()) return List.of();
+
+        int slotMinutes = 30;
+        int bufferMinutes = businessSettingsService.getAppointmentBufferMinutes();
+
+        int serviceDuration = service.getDurationMinutes() == null ? 0 : service.getDurationMinutes();
+        int addOnMinutes = 0;
+
+        if (addOnIds != null && !addOnIds.isEmpty()) {
+            addOnMinutes = addOnService.getAddOnIds(addOnIds).stream()
+                    .map(AddOn::getDurationMinutes)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
         }
 
-        int serviceDurationInMinutes = service.getDurationMinutes();
-        int bufferMinutes = schedulingConfig.getBufferMinutes();
-        int slotMinutes = 30;
+        int requestedDuration = serviceDuration + addOnMinutes;
 
-        LocalDateTime dayOpenTime = LocalDateTime.of(date, workingDay.getOpenTime());
-        LocalDateTime dayCloseTime = LocalDateTime.of(date, workingDay.getCloseTime());
+        LocalDateTime open = LocalDateTime.of(date, workingDay.getOpenTime());
+        LocalDateTime close = LocalDateTime.of(date, workingDay.getCloseTime());
 
-        // Pull only appointments that could block that day
-        List<Appointment> appointments = appointmentRepository
-                .findByServiceIdAndAppointmentTimeBetween(serviceId, dayOpenTime, dayCloseTime);
+        // If single stylist: block against ALL appointments, not by serviceId.
+        List<Appointment> appointments =
+                appointmentRepository.findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(open, close);
 
-        // Convert appointments into blocked intervals
         List<TimeRange> blocked = appointments.stream()
                 .map(a -> {
                     LocalDateTime start = a.getAppointmentTime();
-                    LocalDateTime end = start.plusMinutes(a.getService().getDurationMinutes());
-                    return new TimeRange(start, end.plusMinutes(bufferMinutes));
+                    int apptDuration = a.getDurationMinutes();
+
+                    LocalDateTime blockedUntil = start.plusMinutes(apptDuration + bufferMinutes);
+                    LocalDateTime blockedUntilAligned = ceilToSlot(blockedUntil, slotMinutes);
+
+                    return new TimeRange(start, blockedUntilAligned);
                 })
                 .toList();
 
-        List<AvailableTimeSlotsDTO> availableSlots = new ArrayList<>();
+        LocalDateTime latestStart = close.minusMinutes(requestedDuration + bufferMinutes);
 
-        LocalDateTime latestStartTime = dayCloseTime.minusMinutes(serviceDurationInMinutes + bufferMinutes);
-
-        for (LocalDateTime slotStart = dayOpenTime; !slotStart.isAfter(latestStartTime); slotStart = slotStart.plusMinutes(slotMinutes)) {
-            LocalDateTime slotEnd = slotStart.plusMinutes(serviceDurationInMinutes + bufferMinutes);
+        List<AvailableTimeSlotsDTO> out = new ArrayList<>();
+        for (LocalDateTime slotStart = open; !slotStart.isAfter(latestStart); slotStart = slotStart.plusMinutes(slotMinutes)) {
+            LocalDateTime slotEnd = slotStart.plusMinutes(requestedDuration + bufferMinutes);
 
             LocalDateTime finalSlotStart = slotStart;
-            boolean isBlocked = blocked.stream().anyMatch(b -> isOverlap(finalSlotStart, slotEnd, b.start, b.end));
-            boolean available = !isBlocked;
+            boolean blockedAny = blocked.stream()
+                    .anyMatch(b -> isOverlap(finalSlotStart, slotEnd, b.start, b.end));
 
-            availableSlots.add(
-                    new AvailableTimeSlotsDTO(
-                            slotStart.toLocalTime().toString(),
-                            available,
-                            slotStart,
-                            slotEnd
-                    )
-                );
+            out.add(new AvailableTimeSlotsDTO(
+                    slotStart.toLocalTime().toString(),
+                    !blockedAny,
+                    slotStart,
+                    slotEnd
+            ));
         }
 
-        return availableSlots;
-
+        return out;
     }
 
-    private boolean isOverlap(LocalDateTime aStart, LocalDateTime aEnd, LocalDateTime bStart, LocalDateTime bEnd){
+    private boolean isOverlap(LocalDateTime aStart, LocalDateTime aEnd, LocalDateTime bStart, LocalDateTime bEnd) {
         return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
     }
 
-    private record TimeRange (LocalDateTime start, LocalDateTime end) {}
+    private LocalDateTime ceilToSlot(LocalDateTime t, int slotMinutes) {
+        int minute = t.getMinute();
+        int mod = minute % slotMinutes;
+
+        // already aligned (and clean)
+        if (mod == 0 && t.getSecond() == 0 && t.getNano() == 0) return t;
+
+        int add = (mod == 0) ? 0 : (slotMinutes - mod);
+        return t.plusMinutes(add).withSecond(0).withNano(0);
+    }
+
+    private record TimeRange(LocalDateTime start, LocalDateTime end) {}
 }

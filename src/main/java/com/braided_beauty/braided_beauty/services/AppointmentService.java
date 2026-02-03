@@ -1,6 +1,5 @@
 package com.braided_beauty.braided_beauty.services;
 
-import com.braided_beauty.braided_beauty.config.SchedulingConfig;
 import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
@@ -8,15 +7,12 @@ import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
-import com.braided_beauty.braided_beauty.models.AddOn;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.ServiceModel;
-import com.braided_beauty.braided_beauty.models.User;
+import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
-import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.BusinessHoursRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import com.stripe.exception.StripeException;
@@ -56,7 +52,7 @@ public class AppointmentService {
     private final AddOnService addOnService;
     private final PaymentService paymentService;
     private final AppointmentConfirmationService appointmentConfirmationService;
-    private final SchedulingConfig schedulingConfig;
+    private final BusinessSettingsService businessSettingsService;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
 
@@ -67,7 +63,7 @@ public class AppointmentService {
 
         appointmentRepository.lockSchedule();
 
-        int bufferMinutes = schedulingConfig.getBufferMinutes();
+        int bufferMinutes = businessSettingsService.getAppointmentBufferMinutes();
         LocalDateTime start = dto.getAppointmentTime();
 
         Appointment appointment = appointmentDtoMapper.toEntity(dto);

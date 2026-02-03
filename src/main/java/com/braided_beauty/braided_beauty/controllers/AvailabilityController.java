@@ -23,7 +23,8 @@ public class AvailabilityController {
     @GetMapping
     public ResponseEntity<List<AvailableTimeSlotsDTO>> getAvailability(
             @RequestParam UUID serviceId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(availabilityService.getAvailability(serviceId, date));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) List<UUID> addOnIds) {
+        return ResponseEntity.ok(availabilityService.getAvailability(serviceId, date, addOnIds));
     }
 }

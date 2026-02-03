@@ -69,4 +69,10 @@ public class BusinessSettingsService {
                     }
                 });
     }
+
+    @Transactional(readOnly = true)
+    public int getAppointmentBufferMinutes() {
+        Integer minutes = getSettings().appointmentBufferTime();
+        return minutes == null ? 0 : minutes;
+    }
 }
