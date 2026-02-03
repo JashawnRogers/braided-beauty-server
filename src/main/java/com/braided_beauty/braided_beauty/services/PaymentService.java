@@ -44,7 +44,7 @@ public class PaymentService {
 
     @Transactional
     public void updateRefundPayment(Appointment appointment) throws StripeException {
-        Payment payment = paymentRepository.findByAppointmentIdAndPaymentType(appointment.getId(), PaymentType.FINAL)
+        Payment payment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL)
                 .orElseThrow(() -> new NotFoundException("No payment found for appointment."));
 
         if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
@@ -67,7 +67,7 @@ public class PaymentService {
     @Transactional
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
         // Idempotency guard: if a deposit payment already exists for this appointment, reuse the existing session.
-        paymentRepository.findByAppointmentIdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT)
+        paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT)
                 .ifPresent(existing -> {
                     if (existing.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
                             || existing.getPaymentStatus() == PaymentStatus.REFUNDED
@@ -76,7 +76,7 @@ public class PaymentService {
                     }
                 });
 
-        Optional<Payment> existingDepositOpt = paymentRepository.findByAppointmentIdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT);
+        Optional<Payment> existingDepositOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT);
         if (existingDepositOpt.isPresent() && existingDepositOpt.get().getStripeSessionId() != null
                 && existingDepositOpt.get().getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
             log.info("Reusing existing deposit checkout session {} for appointment {}", existingDepositOpt.get().getStripeSessionId(), appointment.getId());
@@ -142,7 +142,7 @@ public class PaymentService {
         }
 
         // Idempotency guard: reuse an existing pending final-payment session; block if already paid.
-        Optional<Payment> existingFinalOpt = paymentRepository.findByAppointmentIdAndPaymentType(appointment.getId(), PaymentType.FINAL);
+        Optional<Payment> existingFinalOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL);
         if (existingFinalOpt.isPresent()) {
             Payment existing = existingFinalOpt.get();
             if (existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH
@@ -272,7 +272,8 @@ public class PaymentService {
 
         BigDecimal remainingBalance = total.subtract(deposit).setScale(2, RoundingMode.HALF_UP);
 
-        String email = appointment.getUser().getEmail() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+
         BusinessSettings settings = businessSettingsService.getOrCreate();
         String companyPhoneNumber  = PhoneNormalizer.formatForEmail(settings.getCompanyPhoneNumber());
 
@@ -305,8 +306,10 @@ public class PaymentService {
                 .map(a -> new EmailAddOnLine(a.getName(), a.getPrice().toString()))
                 .toList();
 
+        String customerName = (appointment.getUser() != null ? appointment.getUser().getName() : "Guest");
+
         Map<String, Object> base = new HashMap<>();
-        base.put("customerName", appointment.getUser().getName() != null ? appointment.getUser().getName() : "Guest");
+        base.put("customerName", customerName);
         base.put("appointmentDateTime", appointment.getAppointmentTime());
         base.put("serviceName", appointment.getService().getName());
         base.put("depositAmount", appointment.getDepositAmount());
@@ -430,6 +433,8 @@ public class PaymentService {
         paymentRepository.save(payment);
 
         appointment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
+        appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
+        appointment.setCancelReason("Payment failed / abandoned checkout");
         appointment.setHoldExpiresAt(null);
         appointmentRepository.save(appointment);
         log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, session.getPaymentIntent());

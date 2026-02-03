@@ -42,6 +42,38 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                                                   @Param("bufferMinutes") int bufferMinutes
                                                   );
 
+    @Query(
+            value = """
+        SELECT a.*
+        FROM appointments a
+        WHERE a.appointment_time >= :start
+          AND a.appointment_time < :end
+          AND (
+                a.appointment_status = 'CONFIRMED'
+                OR (
+                    a.appointment_status = 'PENDING_CONFIRMATION'
+                    AND a.hold_expires_at IS NOT NULL
+                    AND a.hold_expires_at > now()
+                )
+          )
+        ORDER BY a.appointment_time ASC
+    """,
+            nativeQuery = true
+    )
+    List<Appointment> findBlockingAppointmentsForWindow(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query(value = """
+    SELECT a.*
+    FROM appointments a
+    WHERE a.appointment_status = 'PENDING_CONFIRMATION'
+      AND a.hold_expires_at IS NOT NULL
+      AND a.hold_expires_at <= now()
+""", nativeQuery = true)
+    List<Appointment> findExpiredPendingHolds();
+
     Optional<Appointment> findByStripeSessionId(String sessionId);
     List<Appointment> findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(LocalDateTime start, LocalDateTime end);
     List<Appointment> findAllByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
@@ -53,7 +85,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
             Collection<AppointmentStatus> statuses,
             Pageable pageable
     );
-    List<Appointment> findByServiceIdAndAppointmentTimeBetween(UUID serviceId, LocalDateTime startTime, LocalDateTime closeTime);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Appointment a WHERE a.id IS NOT NULL")

@@ -29,7 +29,7 @@ public class Payment {
     @Column(name = "payment_status")
     private PaymentStatus paymentStatus;
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_Type")
+    @Column(name = "payment_type")
     private PaymentType paymentType;
     @Column(name = "refunded_amount")
     private BigDecimal refundedAmount;
