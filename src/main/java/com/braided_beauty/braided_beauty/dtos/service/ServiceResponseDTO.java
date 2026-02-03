@@ -25,6 +25,7 @@ public class ServiceResponseDTO {
     @Nullable private Integer pointsEarned;
     @Nullable private List<String> photoKeys;
     @Nullable private String coverImageUrl;
+    @Nullable private List<String> photoUrls;
     @Nullable private String videoKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -22,7 +22,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -79,18 +81,34 @@ public class ServicesService {
     }
 
     @Transactional
-    public ServiceResponseDTO updateService(UUID serviceId, ServiceRequestDTO serviceRequestDTO){
+    public ServiceResponseDTO updateService(UUID serviceId, ServiceRequestDTO dto){
         ServiceModel existingService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
 
-        serviceDtoMapper.updateDto(serviceRequestDTO, existingService);
+        List<String> beforeKeys = existingService.getPhotoKeys() == null
+                ? List.of()
+                : List.copyOf(existingService.getPhotoKeys());
 
-        if (serviceRequestDTO.getAddOnIds() != null && !serviceRequestDTO.getAddOnIds().isEmpty()) {
-            existingService.setAddOns(addOnRepository.findAllById(serviceRequestDTO.getAddOnIds()));
+        serviceDtoMapper.updateDto(dto, existingService);
+
+        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
+            existingService.setAddOns(addOnRepository.findAllById(dto.getAddOnIds()));
+        }
+
+        if (dto.getRemovePhotoKeys() != null && !dto.getRemovePhotoKeys().isEmpty()) {
+            var beforeSet = new HashSet<>(beforeKeys);
+            for (String key : dto.getRemovePhotoKeys()) {
+                if (beforeSet.contains(key)) {
+                    try {
+                        mediaService.delete(key);
+                    } catch (Exception e) {
+                        log.warn("S3 deletion failed for key={}", key, e);
+                    }
+                }
+            }
         }
 
         ServiceModel saved = serviceRepository.save(existingService);
-
         log.info("Updated service with ID: {}", serviceId);
         return serviceDtoMapper.toDto(saved);
     }
@@ -107,14 +125,14 @@ public class ServicesService {
         }
         return serviceRepository.findAll(spec, pageable)
                 .map(serviceDtoMapper::toDto)
-                .map(dto -> {attachCoverImage(dto); return dto; });
+                .map(dto -> {attachPhotoUrls(dto); return dto; });
     }
 
     public List<ServiceResponseDTO> getAllServicesByList() {
         return serviceRepository.findAll()
                 .stream()
                 .map(serviceDtoMapper::toDto)
-                .peek(this::attachCoverImage)
+                .peek(this::attachPhotoUrls)
                 .toList();
     }
 
@@ -124,7 +142,7 @@ public class ServicesService {
 
         ServiceResponseDTO dto = serviceDtoMapper.toDto(service);
 
-        attachCoverImage(dto);
+        attachPhotoUrls(dto);
 
         log.info("Retrieved service with ID: {}", serviceId);
         return dto;
@@ -134,25 +152,28 @@ public class ServicesService {
                 .orElseThrow(() -> new NotFoundException("No services found under this category"))
                 .stream()
                 .map(serviceDtoMapper::toDto)
-                .peek(this::attachCoverImage)
+                .peek(this::attachPhotoUrls)
                 .toList();
     }
 
-    private void attachCoverImage(ServiceResponseDTO dto) {
+    private void attachPhotoUrls(ServiceResponseDTO dto) {
         List<String> keys = dto.getPhotoKeys();
 
         if (keys == null || keys.isEmpty()) {
             return;
         }
 
-        String coverKey = keys.get(0);
 
         try {
-            String coverUrl = mediaService.presignGet(coverKey, Duration.ofMinutes(60));
-            dto.setCoverImageUrl(coverUrl);
+            List<String> urls = keys.stream()
+                            .map(url -> mediaService.presignGet(url, Duration.ofMinutes(60)))
+                            .toList();
+            dto.setCoverImageUrl(urls.getFirst());
+            dto.setPhotoUrls(urls);
         } catch (Exception e) {
-            log.warn("Failed to presign cover image for key={}", coverKey, e);
+            log.warn("Failed to presign cover image for keys");
             dto.setCoverImageUrl(null);
+            dto.setPhotoUrls(null);
         }
 
     }
