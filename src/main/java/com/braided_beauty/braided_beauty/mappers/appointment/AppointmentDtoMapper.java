@@ -7,6 +7,7 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.User;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +54,7 @@ public class AppointmentDtoMapper {
     }
 
     public AppointmentSummaryDTO toSummaryDTO(Appointment appointment) {
+
         return AppointmentSummaryDTO.builder()
                 .id(appointment.getId())
                 .serviceName(appointment.getService().getName())
@@ -66,6 +68,7 @@ public class AppointmentDtoMapper {
         String serviceName = appointment.getService().getName();
         BigDecimal tip = Optional.ofNullable(appointment.getTipAmount()).orElse(BigDecimal.ZERO);
         BigDecimal servicePrice = Optional.ofNullable(appointment.getService().getPrice()).orElse(BigDecimal.ZERO);
+        User user = appointment.getUser();
 
         List<UUID> addOnIds = appointment.getAddOns().stream()
                 .map(AddOn::getId)
@@ -83,13 +86,13 @@ public class AppointmentDtoMapper {
                 .add(totalPriceOfAddOns)
                 .add(tip);
 
-        String customerName = appointment.getUser().getName() != null ?
-                appointment.getUser().getName() :
-                "Guest";
+        String customerName = user != null  && user.getName() != null
+                ? user.getName()
+                : "Guest";
 
-        String customerEmail = appointment.getGuestEmail() != null ?
-                appointment.getGuestEmail() :
-                appointment.getUser().getEmail();
+        String customerEmail = appointment.getGuestEmail() != null
+                ? appointment.getGuestEmail()
+                : appointment.getUser().getEmail();
 
         return AdminAppointmentSummaryDTO.builder()
                 .id(appointment.getId())
