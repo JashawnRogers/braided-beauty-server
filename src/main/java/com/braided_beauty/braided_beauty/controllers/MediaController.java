@@ -8,15 +8,17 @@ import com.braided_beauty.braided_beauty.services.MediaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/media")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class MediaController {
     private final MediaService mediaService;
 
-    @PutMapping("/presign")
+    @PostMapping("/presign-put")
     public ResponseEntity<PresignPutResponseDTO> presign(@Valid @RequestBody PresignUploadRequestDTO req) {
         return ResponseEntity.ok(mediaService.presignPut(req));
     }

@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.dtos.presign;
 
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,5 +24,6 @@ public class PresignUploadRequestDTO {
     private String purpose;
 
     // Optional - use when attaching to an existing service
+    @Nullable
     private UUID serviceId;
 }

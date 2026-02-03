@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +32,8 @@ public class ServicesService {
     private final ServiceCategoryRepository categoryRepository;
     private final ServiceDtoMapper serviceDtoMapper;
     private final AddOnRepository addOnRepository;
+    private final MediaService mediaService;
+
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
     @Transactional
@@ -48,6 +51,7 @@ public class ServicesService {
         }
 
         ServiceModel entity = serviceDtoMapper.create(dto);
+
         if (dto.getCategoryId() != null) {
             ServiceCategory categoryProxy = categoryRepository.getReferenceById(dto.getCategoryId());
             entity.setCategory(categoryProxy);
@@ -85,8 +89,10 @@ public class ServicesService {
             existingService.setAddOns(addOnRepository.findAllById(serviceRequestDTO.getAddOnIds()));
         }
 
+        ServiceModel saved = serviceRepository.save(existingService);
+
         log.info("Updated service with ID: {}", serviceId);
-        return serviceDtoMapper.toDto(existingService);
+        return serviceDtoMapper.toDto(saved);
     }
 
     public Page<ServiceResponseDTO> getAllServices(String name, Pageable pageable){
@@ -100,27 +106,54 @@ public class ServicesService {
             ));
         }
         return serviceRepository.findAll(spec, pageable)
-                .map(serviceDtoMapper::toDto);
+                .map(serviceDtoMapper::toDto)
+                .map(dto -> {attachCoverImage(dto); return dto; });
     }
 
     public List<ServiceResponseDTO> getAllServicesByList() {
         return serviceRepository.findAll()
                 .stream()
                 .map(serviceDtoMapper::toDto)
+                .peek(this::attachCoverImage)
                 .toList();
     }
 
     public ServiceResponseDTO getServiceById(UUID serviceId){
         ServiceModel service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found."));
+
+        ServiceResponseDTO dto = serviceDtoMapper.toDto(service);
+
+        attachCoverImage(dto);
+
         log.info("Retrieved service with ID: {}", serviceId);
-        return serviceDtoMapper.toDto(service);
+        return dto;
     }
     public List<ServiceResponseDTO> getAllServicesByCategory(UUID categoryId) {
        return serviceRepository.findAllByCategoryId(categoryId)
                 .orElseThrow(() -> new NotFoundException("No services found under this category"))
                 .stream()
                 .map(serviceDtoMapper::toDto)
+                .peek(this::attachCoverImage)
                 .toList();
+    }
+
+    private void attachCoverImage(ServiceResponseDTO dto) {
+        List<String> keys = dto.getPhotoKeys();
+
+        if (keys == null || keys.isEmpty()) {
+            return;
+        }
+
+        String coverKey = keys.get(0);
+
+        try {
+            String coverUrl = mediaService.presignGet(coverKey, Duration.ofMinutes(60));
+            dto.setCoverImageUrl(coverUrl);
+        } catch (Exception e) {
+            log.warn("Failed to presign cover image for key={}", coverKey, e);
+            dto.setCoverImageUrl(null);
+        }
+
     }
 }

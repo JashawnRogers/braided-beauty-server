@@ -2,25 +2,25 @@ package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.dtos.presign.PresignPutResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.presign.PresignUploadRequestDTO;
+import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadResponseDTO;
+import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.records.S3Properties;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
 import java.net.URL;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class MediaService {
@@ -58,18 +58,17 @@ public class MediaService {
         final String purpose = request.getPurpose();
 
         boolean isImage = "service-photo".equals(purpose);
-        boolean isVideo = "service-video".equals(purpose);
 
-        if (!isImage && !isVideo) throw new IllegalArgumentException("Unsupported purpose " + purpose);
-        if (isImage && !allowedImages.contains(contentType)) throw new IllegalArgumentException("Unsupported image type " + contentType);
-        if (isVideo && !allowedVideos.contains(contentType)) throw new IllegalArgumentException("Unsupported video type " + contentType);
+        if (!isImage) throw new IllegalArgumentException("Unsupported purpose " + purpose);
+        if (!allowedImages.contains(contentType))
+            throw new IllegalArgumentException("Unsupported image type " + contentType);
 
-        long maxBytes = isImage ? maxImageBytes : maxVideoBytes;
+
 
         String extension = fileExtensionFrom(contentType, request.getFileName());
-        String prefix = isImage ? "services/photos" : "services/videos";
+        String prefix = "services/photos";
         if (request.getServiceId() != null) {
-            prefix = isImage ? ("services/" + request.getServiceId() + "/photos") : ("services/" + request.getServiceId() + "/videos");
+            prefix = ("services/" + request.getServiceId() + "/photos");
         }
         String key = prefix + "/" + UUID.randomUUID() + extension;
         Duration duration = Duration.ofMinutes(5);
@@ -93,9 +92,29 @@ public class MediaService {
                 .headers(headers)
                 .s3ObjectKey(key)
                 .contentType(contentType)
-                .maxBytes(maxBytes)
+                .maxBytes(maxImageBytes)
                 .build();
 
+    }
+
+    public String presignGet(String key, Duration duration) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("s3ObjectKey is null/blank");
+        }
+
+        GetObjectRequest get = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build();
+
+        PresignedGetObjectRequest presignedGetObjectRequest = s3Presigner.presignGetObject(
+                GetObjectPresignRequest.builder()
+                        .signatureDuration(duration)
+                        .getObjectRequest(get)
+                        .build()
+        );
+
+        return presignedGetObjectRequest.url().toString();
     }
 
     public FinalizeUploadResponseDTO verifyAndFinalize(FinalizeUploadRequestDTO dto) {
@@ -104,18 +123,15 @@ public class MediaService {
         }
 
         boolean isImage = "service-photo".equals(dto.getPurpose());
-        boolean isVideo = "service-video".equals(dto.getPurpose());
-        if (!isImage && !isVideo) throw new IllegalArgumentException("Unsupported purpose: " + dto.getPurpose());
-
-        long maxBytes = isImage ? maxImageBytes : maxVideoBytes;
+        if (!isImage) throw new IllegalArgumentException("Unsupported purpose: " + dto.getPurpose());
 
 
         HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucket).key(dto.getS3ObjectKey()));
         String contentType = head.contentType();
         long length = head.contentLength() == null ? -1L : head.contentLength();
 
-        boolean typeOK = (isImage ? allowedImages : allowedVideos).contains(contentType);
-        boolean sizeOK = length >= 0 && length <= maxBytes;
+        boolean typeOK = allowedImages.contains(contentType);
+        boolean sizeOK = length >= 0 && length <= maxImageBytes;
         boolean expectedOK = dto.getExpectedContentType() != null && dto.getExpectedContentType().equalsIgnoreCase(contentType);
         boolean valid = typeOK && sizeOK && expectedOK;
 

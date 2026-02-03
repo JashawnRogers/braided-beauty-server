@@ -45,17 +45,11 @@ public class ServiceRequestDTO {
     // Media state deltas:
     // If null -> leave unchanged - If present -> apply changes
     @Nullable
+    private String coverImageUrl;
+    @Nullable
     private List<String> photoKeys;
     @Nullable
     private List<String> addPhotoKeys;
     @Nullable
     private List<String> removePhotoKeys;
-
-    /**
-     * - null -> leave unchanged
-     * - "" (blank) -> clear video
-     * - non-blank -> set/replace with video key
-     */
-    @Nullable
-    private String videoKey;
 }

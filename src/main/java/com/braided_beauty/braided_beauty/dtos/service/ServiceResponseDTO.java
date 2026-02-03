@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.dtos.service;
 
 import com.braided_beauty.braided_beauty.dtos.addOn.AddOnResponseDTO;
+import jakarta.annotation.Nullable;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -21,11 +22,12 @@ public class ServiceResponseDTO {
     private BigDecimal price;
     private BigDecimal depositAmount;
     private Integer durationMinutes;
-    private Integer pointsEarned;
-    private List<String> photoKeys;
-    private String videoKey;
+    @Nullable private Integer pointsEarned;
+    @Nullable private List<String> photoKeys;
+    @Nullable private String coverImageUrl;
+    @Nullable private String videoKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<AddOnResponseDTO> addOns;
+    @Nullable private List<AddOnResponseDTO> addOns;
 
 }

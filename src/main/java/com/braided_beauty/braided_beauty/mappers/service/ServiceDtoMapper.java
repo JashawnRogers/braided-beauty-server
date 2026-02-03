@@ -93,17 +93,6 @@ public class ServiceDtoMapper {
             keys.addAll(toAdd);
             service.setPhotoKeys(new ArrayList<>(keys));
         }
-
-        /*
-         * Video:
-         * - null -> keep
-         * - "" -> clear
-         * - non-null -> set/update
-         */
-        if (dto.getVideoKey() != null){
-            String videoKey = dto.getVideoKey().trim();
-            service.setVideoKey(videoKey.isBlank() ? null : videoKey);
-        }
     }
 
     public PopularServiceDTO toMostPopularServiceDto(ServiceModel service){

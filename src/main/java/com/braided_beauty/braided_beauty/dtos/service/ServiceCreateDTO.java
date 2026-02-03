@@ -20,16 +20,23 @@ import java.util.UUID;
 public class ServiceCreateDTO {
     @NotNull
     private UUID categoryId;
+
     @Size(min = 1, max = 150)
     private String name;
+
     @Size(max = 500)
     private String description;
+
     @DecimalMin(value = "0.00", message = "Price amount must not be a negative number.")
     private BigDecimal price;
+
     @Min(value = -1, message = "Duration of service must not be a negative number")
     private Integer durationMinutes;
+
     private List<String> photoKeys;
+
     private String videoKey;
+
     @Nullable
     private List<UUID> addOnIds = List.of();
 }
