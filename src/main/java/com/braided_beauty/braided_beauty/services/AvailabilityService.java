@@ -52,6 +52,14 @@ public class AvailabilityService {
         LocalDateTime open = LocalDateTime.of(date, workingDay.getOpenTime());
         LocalDateTime close = LocalDateTime.of(date, workingDay.getCloseTime());
 
+        if (date.equals(LocalDate.now())) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime minStart = ceilToSlot(now, slotMinutes);
+            if (minStart.isAfter(open)) {
+                open = minStart;
+            }
+        }
+
         // If single stylist: block against ALL appointments, not by serviceId.
         List<Appointment> appointments =
                 appointmentRepository.findBlockingAppointmentsForWindow(open, close);

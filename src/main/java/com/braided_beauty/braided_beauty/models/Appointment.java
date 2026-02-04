@@ -15,7 +15,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "appointments")
+@Table(name = "appointments",
+        uniqueConstraints = {
+        @UniqueConstraint(
+                name = "uk_appointment_time",
+                columnNames = "appointment_time"
+            )
+        }
+)
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

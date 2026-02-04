@@ -49,7 +49,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
         WHERE a.appointment_time >= :start
           AND a.appointment_time < :end
           AND (
-                a.appointment_status = 'CONFIRMED'
+                a.appointment_status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')
                 OR (
                     a.appointment_status = 'PENDING_CONFIRMATION'
                     AND a.hold_expires_at IS NOT NULL

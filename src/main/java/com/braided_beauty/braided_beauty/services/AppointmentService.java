@@ -19,8 +19,10 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -109,7 +111,6 @@ public class AppointmentService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         int durationMinutes = (service.getDurationMinutes() == null ? 0 : service.getDurationMinutes()) + addOnMinutes;
-
         appointment.setDurationMinutes(durationMinutes);
 
         // ----- conflict check uses duration + buffer -----
@@ -130,43 +131,60 @@ public class AppointmentService {
         appointment.setDepositAmount(deposit);
         appointment.setTotalAmount(total);
 
-        if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
-            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
-            appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
-            appointment.setHoldExpiresAt(null);
-            appointment.setCreatedAt(LocalDateTime.now());
-            appointment.setRemainingBalance(BigDecimal.ZERO);
-            Appointment savedNoDepositRequired = appointmentRepository.save(appointment);
+        // -------------------------------
+        // TRY/CATCH #1: save appointment row
+        // -------------------------------
+        try {
+            if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
+                appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+                appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
+                appointment.setHoldExpiresAt(null);
+                appointment.setCreatedAt(LocalDateTime.now());
+                appointment.setRemainingBalance(BigDecimal.ZERO);
 
-            BookingConfirmationToken confirmationToken = appointmentConfirmationService
-                    .ensureConfirmationTokenForAppointment(savedNoDepositRequired.getId());
+                // Force constraint failure to happen inside THIS method
+                Appointment savedNoDepositRequired = appointmentRepository.saveAndFlush(appointment);
 
-            return new AppointmentCreateResponseDTO(
-                    savedNoDepositRequired.getId(),
-                    false,
-                    null, confirmationToken.token()
-            );
-        } else {
-            appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
-            appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
-            appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
-            appointment.setRemainingBalance(total.subtract(deposit).setScale(2, RoundingMode.HALF_UP));
+                BookingConfirmationToken confirmationToken =
+                        appointmentConfirmationService.ensureConfirmationTokenForAppointment(savedNoDepositRequired.getId());
 
+                return new AppointmentCreateResponseDTO(
+                        savedNoDepositRequired.getId(),
+                        false,
+                        null,
+                        confirmationToken.token()
+                );
+            } else {
+                appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+                appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
+                appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
+                appointment.setRemainingBalance(total.subtract(deposit).setScale(2, RoundingMode.HALF_UP));
+                appointment.setCreatedAt(LocalDateTime.now());
 
-            appointment.setCreatedAt(LocalDateTime.now());
+                // Force constraint failure here too
+                Appointment saved = appointmentRepository.saveAndFlush(appointment);
 
-            Appointment saved = appointmentRepository.save(appointment);
+                // ----- Call payment service after save -----
+                String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+                String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
 
-            // ----- Call payment service after save -----
-            String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
-            String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
+                Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
 
-            Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
+                // -------------------------------
+                // TRY/CATCH #2 is NOT required for unique time
+                // (this is an UPDATE, not a new appointment_time insert)
+                // -------------------------------
+                saved.setStripeSessionId(session.getId());
+                appointmentRepository.save(saved);
 
-            saved.setStripeSessionId(session.getId());
-            appointmentRepository.save(saved);
+                return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
+            }
+        } catch (DataIntegrityViolationException ex) {
+            if (isAppointmentTimeUniqueViolation(ex)) {
 
-            return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
+                throw new ConflictException("That time was just booked. Please pick another time.");
+            }
+            throw ex;
         }
     }
 
@@ -268,5 +286,16 @@ public class AppointmentService {
         return appointmentRepository
                 .findByUser_IdAndAppointmentStatusInOrderByAppointmentTimeDesc(userId, statuses, pageable)
                 .map(appointmentDtoMapper::toSummaryDTO);
+    }
+
+    private boolean isAppointmentTimeUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable t = ex;
+        while (t != null) {
+            if (t instanceof ConstraintViolationException cve) {
+                return "uk_appointment_time".equals(cve.getConstraintName());
+            }
+            t = t.getCause();
+        }
+        return false;
     }
 }
