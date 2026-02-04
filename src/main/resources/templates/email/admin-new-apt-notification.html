@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:replace="email/_layout :: layout(~{::content})">
+
+<div th:fragment="content">
+
+    <h3 style="margin:0 0 12px 0; font-size:18px;">New appointment booked</h3>
+
+    <p style="margin:0 0 12px 0;">
+        A customer has booked an appointment and the deposit has been paid.
+    </p>
+
+    <p style="margin:0 0 16px 0;">
+        <strong>Date &amp; time:</strong>
+        <span th:text="${#temporals.format(appointmentDateTime, 'MMM d, yyyy h:mm a')}">
+      Jan 31, 2026 2:00 PM
+    </span>
+    </p>
+
+    <!-- Summary -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="width:100%; border-collapse:collapse; margin-top:12px;">
+
+        <tr>
+            <td style="padding:6px 0; font-size:14px;">Service</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <strong th:text="${serviceName}">Knotless Braids</strong>
+            </td>
+        </tr>
+
+        <tr th:if="${addOns != null && !addOns.isEmpty()}">
+            <td style="padding:6px 0; font-size:14px; vertical-align:top;">Add-ons</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <div th:each="addOn : ${addOns}" style="margin:0;">
+                    <span th:text="${addOn}">Boho curls</span>
+                </div>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding:6px 0; font-size:14px;">Customer</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <strong th:text="${customerName}">Guest</strong>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding:6px 0; font-size:14px;">Email</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <strong th:text="${customerEmail}">guest@email.com</strong>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding:6px 0; font-size:14px;">Deposit paid</td>
+            <td align="right" style="padding:6px 0; font-size:14px;">
+                <strong th:text="${'$' + #numbers.formatDecimal(depositAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
+            </td>
+        </tr>
+
+    </table>
+
+    <!-- Notes -->
+    <div th:if="${customerNote != null && !customerNote.isBlank()}"
+         style="margin-top:18px; padding-top:14px; border-top:1px solid #eee;">
+
+        <p style="margin:0 0 10px 0; font-weight:bold;">Customer notes</p>
+
+        <p style="margin:0; font-size:14px; line-height:1.4;"
+           th:text="${customerNote}">
+            Please start a little earlier if possible.
+        </p>
+    </div>
+
+    <!-- Quick prep reminder -->
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid #eee;">
+        <p style="margin:0; font-size:14px; line-height:1.4;">
+            View and manage this appointment in the admin dashboard.
+        </p>
+    </div>
+
+</div>
+</html>

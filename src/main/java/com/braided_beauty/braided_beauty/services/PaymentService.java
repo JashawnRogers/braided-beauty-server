@@ -335,11 +335,32 @@ public class PaymentService {
                 Map<String, Object> depositModel = new HashMap<>(base);
                 depositModel.put("remainingAmount", remainingBalance);
 
+                Map<String, Object> adminModel = new HashMap<>();
+                adminModel.put("appointmentDateTime", saved.getAppointmentTime());
+                adminModel.put("serviceName", saved.getService().getName());
+                adminModel.put("addOns", saved.getAddOns().stream()
+                        .map(AddOn::getName)
+                        .filter(Objects::nonNull)
+                        .toList());
+                adminModel.put("customerName", customerName);
+                adminModel.put("customerEmail", email);
+                adminModel.put("depositAmount", saved.getDepositAmount() != null ? saved.getDepositAmount() : BigDecimal.ZERO);
+                adminModel.put("customerNote", saved.getNote() != null ? saved.getNote() : "");
+
+                String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
+
                 // Build email work to run AFTER COMMIT.
                 afterCommitEmailWork = () -> {
                     try {
                         String html = emailTemplateService.render("deposit-receipt", depositModel);
+                        String adminHtml = emailTemplateService.render("admin-new-apt-notification", adminModel);
                         emailService.sendHtmlEmail(email, "Deposit confirmation", html);
+                        emailService.sendHtmlEmail(
+                                adminEmail,
+                                "New Appointment Booked - " + appointment.getAppointmentTime().toLocalDate() + " " + appointment.getAppointmentTime().toLocalTime(),
+                                    adminHtml
+                        );
+                        log.info("Emails sent!");
 
                         // Token creation is helpful but must not prevent confirmation.
                         appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
