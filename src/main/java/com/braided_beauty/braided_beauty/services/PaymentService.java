@@ -6,6 +6,7 @@ import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
+import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
@@ -39,6 +40,7 @@ public class PaymentService {
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
     private final BusinessSettingsService businessSettingsService;
+    private final FrontendProps frontendProps;
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
@@ -331,12 +333,15 @@ public class PaymentService {
                 appointment.setRemainingBalance(remainingBalance);
                 appointment.setLoyaltyApplied(false);
                 Appointment saved = appointmentRepository.save(appointment);
+                service.setTimesBooked(service.getTimesBooked() + 1);
 
                 Map<String, Object> depositModel = new HashMap<>(base);
                 depositModel.put("remainingAmount", remainingBalance);
 
                 Map<String, Object> adminModel = new HashMap<>();
+                String clientType = appointment.getUser() != null ? "Member" : "Guest";
                 adminModel.put("appointmentDateTime", saved.getAppointmentTime());
+                adminModel.put("clientType", clientType);
                 adminModel.put("serviceName", saved.getService().getName());
                 adminModel.put("addOns", saved.getAddOns().stream()
                         .map(AddOn::getName)
@@ -346,6 +351,7 @@ public class PaymentService {
                 adminModel.put("customerEmail", email);
                 adminModel.put("depositAmount", saved.getDepositAmount() != null ? saved.getDepositAmount() : BigDecimal.ZERO);
                 adminModel.put("customerNote", saved.getNote() != null ? saved.getNote() : "");
+                adminModel.put("adminAppointmentUrl", frontendProps.baseUrl() + "/admin/appointment/" + appointment.getId());
 
                 String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
 
