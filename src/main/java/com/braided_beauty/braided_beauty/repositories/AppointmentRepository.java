@@ -79,9 +79,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     List<Appointment> findAllByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
     Optional<Appointment> findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(UUID userId, LocalDateTime now,
                                                                                        Collection<AppointmentStatus> status);
-    Page<Appointment> findUserByIdAndAppointmentTimeBeforeAndAppointmentStatusIn(
+    Page<Appointment> findByUser_IdAndAppointmentStatusInOrderByAppointmentTimeDesc(
             UUID userId,
-            LocalDateTime now,
             Collection<AppointmentStatus> statuses,
             Pageable pageable
     );

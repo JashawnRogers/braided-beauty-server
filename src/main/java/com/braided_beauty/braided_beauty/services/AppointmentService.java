@@ -250,7 +250,7 @@ public class AppointmentService {
         LocalDateTime now = LocalDateTime.now();
 
         List<AppointmentStatus> statuses = List.of(
-                AppointmentStatus.COMPLETED
+                AppointmentStatus.CONFIRMED
         );
 
         return appointmentRepository.findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(userId, now, statuses)
@@ -258,15 +258,15 @@ public class AppointmentService {
     }
 
     public Page<AppointmentSummaryDTO> getPreviousAppointments(UUID userId, Pageable pageable){
-        LocalDateTime now = LocalDateTime.now();
 
         List<AppointmentStatus> statuses = List.of(
                 AppointmentStatus.COMPLETED,
-                AppointmentStatus.CANCELED
+                AppointmentStatus.CANCELED,
+                AppointmentStatus.NO_SHOW
         );
 
         return appointmentRepository
-                .findUserByIdAndAppointmentTimeBeforeAndAppointmentStatusIn(userId, now, statuses, pageable)
+                .findByUser_IdAndAppointmentStatusInOrderByAppointmentTimeDesc(userId, statuses, pageable)
                 .map(appointmentDtoMapper::toSummaryDTO);
     }
 }
