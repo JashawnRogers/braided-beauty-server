@@ -3,6 +3,7 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
@@ -12,7 +13,6 @@ import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
-import com.braided_beauty.braided_beauty.repositories.BusinessHoursRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import com.stripe.exception.StripeException;
@@ -26,11 +26,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -55,6 +58,8 @@ public class AppointmentService {
     private final PaymentService paymentService;
     private final AppointmentConfirmationService appointmentConfirmationService;
     private final BusinessSettingsService businessSettingsService;
+    private final EmailService emailService;
+    private final EmailTemplateService emailTemplateService;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
 
@@ -82,6 +87,7 @@ public class AppointmentService {
             appointment.setUser(null);
             appointment.setGuestEmail(email);
             appointment.setGuestCancelToken(UUID.randomUUID().toString());
+            appointment.setGuestTokenExpiresAt(appointment.getAppointmentTime());
         }
 
         boolean hasUser = appointment.getUser() != null;
@@ -189,66 +195,57 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponseDTO cancelAppointment(CancelAppointmentDTO dto) {
-        UUID appointmentId = dto.getAppointmentId();
-        UUID userId = dto.getUserId();
-        String reason = dto.getCancelReason();
+    public AppointmentResponseDTO cancelAppointment(CancelAppointmentDTO dto, UUID userId) {
+        Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
 
-        Appointment canceledAppointment = appointmentRepository.findByIdForUpdate(appointmentId)
-                .orElseThrow(() -> new NotFoundException("No appointment found"));
+        assertMemberOwnsAppointment(appointment, userId);
+        assertCancelable(appointment);
 
-        if (canceledAppointment.getUser() == null) {
-            throw new UnauthorizedException("Guest appointments cannot be canceled via this endpoint");
-        }
+        applyCancellation(appointment, dto.getCancelReason());
 
-        if  (!canceledAppointment.getUser().getId().equals(userId)) {
-            throw new UnauthorizedException("You cannot cancel someone else's appointment");
-        }
+        Appointment saved = appointmentRepository.save(appointment);
 
-        if (canceledAppointment.getAppointmentStatus() == AppointmentStatus.CANCELED){
-            throw new ConflictException("Appointment already canceled");
-        }
+        sendCancellationEmailsAfterCommit(saved, false);
 
-        canceledAppointment.setAppointmentStatus(AppointmentStatus.CANCELED);
-        canceledAppointment.setCancelReason(reason);
-        canceledAppointment.setUpdatedAt(LocalDateTime.now());
-
-        appointmentRepository.save(canceledAppointment);
-
-        return appointmentDtoMapper.toDTO(canceledAppointment);
+        return appointmentDtoMapper.toDTO(saved);
     }
 
     @Transactional
     public AppointmentResponseDTO cancelGuestAppointment(String token, String reason) {
         if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("Missing cancel token");
+            throw new IllegalArgumentException("Missing cancellation token");
         }
 
         Appointment appointment = appointmentRepository.findByGuestCancelTokenForUpdate(token)
                 .orElseThrow(() -> new NotFoundException("No appointment found for this cancel token"));
 
-        if (appointment.getUser() != null) {
-            throw new UnauthorizedException("This cancel token is not valid for member appointments");
-        }
+        assertGuestAppointment(appointment);
+        assertGuestCancelTokenValid(appointment);
+        assertCancelable(appointment);
 
-        if (appointment.getAppointmentStatus() == AppointmentStatus.CANCELED) {
-            throw new ConflictException("Appointment already cancelled");
-        }
-
-        appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
-        appointment.setCancelReason(reason);
-        appointment.setUpdatedAt(LocalDateTime.now());
+        applyCancellation(appointment, reason);
 
         appointment.setGuestCancelToken(null);
+        appointment.setGuestTokenExpiresAt(null);
 
-        appointmentRepository.save(appointment);
-        return appointmentDtoMapper.toDTO(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
+
+        sendCancellationEmailsAfterCommit(saved, true);
+
+        return appointmentDtoMapper.toDTO(saved);
     }
 
     public AppointmentResponseDTO getAppointmentById(UUID appointmentId){
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
         log.info("Retrieved service with ID: {}", appointment.getId());
+        return appointmentDtoMapper.toDTO(appointment);
+    }
+
+    public AppointmentResponseDTO getGuestAppointmentByToken(String token) {
+        Appointment appointment = appointmentRepository.findByGuestCancelToken(token)
+                .orElseThrow(() -> new NotFoundException("Appointment not found"));
         return appointmentDtoMapper.toDTO(appointment);
     }
 
@@ -297,5 +294,151 @@ public class AppointmentService {
             t = t.getCause();
         }
         return false;
+    }
+
+    private void runAfterCommit(Runnable work) {
+        if (work == null) return;
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    work.run();
+                }
+            });
+        } else {
+            work.run();
+        }
+    }
+
+    private void assertCancelable(Appointment appointment) {
+        if (appointment.getAppointmentStatus() == AppointmentStatus.CANCELED) {
+            throw new ConflictException("Appointment already canceled");
+        }
+        if (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED) {
+            throw new ConflictException("Can not cancel an appointment that has already been completed");
+        }
+        if (appointment.getAppointmentStatus() == AppointmentStatus.NO_SHOW) {
+            throw new ConflictException("Appointment has already been marked as No Show meaning this appointment is already effectively cancelled");
+        }
+    }
+
+    private void assertGuestCancelTokenValid(Appointment appointment) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (appointment.getGuestCancelToken() == null || appointment.getGuestCancelToken().isBlank()) {
+            throw new ConflictException("This cancellation link has expired.");
+        }
+
+        LocalDateTime expiresAt = appointment.getGuestTokenExpiresAt();
+        if (expiresAt == null || now.isAfter(expiresAt)) {
+            throw new ConflictException("This cancellation link has expired.");
+        }
+    }
+
+    private void assertGuestAppointment(Appointment appointment) {
+        if (appointment.getUser() != null) {
+            throw new UnauthorizedException("This cancel token is not valid for member appointments");
+        }
+    }
+
+    private void assertMemberOwnsAppointment(Appointment appointment, UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        if (appointment.getUser() == null) {
+            throw new UnauthorizedException("Guest appointments cannot be canceled via this endpoint");
+        }
+        if (!appointment.getUser().getId().equals(userId) && !user.getUserType().equals(UserType.ADMIN)) {
+            throw new UnauthorizedException("You cannot cancel someone else's appointment");
+        }
+    }
+
+    private void applyCancellation(Appointment appointment, String reason) {
+        if (reason != null && !reason.isBlank()) {
+            appointment.setCancelReason(reason.trim());
+        }
+
+        appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
+        appointment.setHoldExpiresAt(null);
+        appointment.setUpdatedAt(LocalDateTime.now());
+    }
+
+    private List<String> addOnNames(Appointment appt) {
+        if (appt.getAddOns() == null) return List.of();
+        return appt.getAddOns().stream()
+                .map(AddOn::getName)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private String displayCustomerName(Appointment appointment) {
+        if (appointment.getUser() != null && appointment.getUser().getName() != null && !appointment.getUser().getName().isBlank()) {
+            return appointment.getUser().getName();
+        }
+        return "Guest";
+    }
+
+    private String customerEmail(Appointment appointment) {
+        if (appointment.getUser() != null) return appointment.getUser().getEmail();
+        return appointment.getGuestEmail();
+    }
+
+    private Map<String, Object> buildCustomerCancelModel(Appointment appointment, boolean isGuest) {
+        Map<String, Object> m = new HashMap<>();
+
+        m.put("customerName", displayCustomerName(appointment));
+        m.put("appointmentDateTime", appointment.getAppointmentTime());
+        m.put("serviceName", appointment.getService().getName());
+        m.put("addOns", addOnNames(appointment));
+        m.put("customerNote", appointment.getNote());
+        m.put("cancelReason", appointment.getCancelReason());
+        m.put("depositAmount", appointment.getDepositAmount());
+        m.put("isGuest", isGuest);
+        m.put("bookUrl", frontendProps.baseUrl() + "/categories");
+        m.put("memberManageUrl", frontendProps.baseUrl());
+
+        return m;
+    }
+
+    private Map<String, Object> buildAdminCancelModel(Appointment appointment) {
+        Map<String, Object> m = new HashMap<>();
+
+        m.put("appointmentDateTime", appointment.getAppointmentTime());
+        m.put("serviceName", appointment.getService().getName());
+        m.put("addOns", addOnNames(appointment));
+        m.put("customerName", displayCustomerName(appointment));
+        m.put("customerEmail", customerEmail(appointment));
+        m.put("depositAmount", appointment.getDepositAmount());
+        m.put("customerNote", appointment.getNote());
+        m.put("cancelReason", appointment.getCancelReason());
+        m.put("adminDashboardUrl", frontendProps.baseUrl());
+
+        return m;
+    }
+
+    private void sendCancellationEmailsAfterCommit(Appointment appointment, boolean isGuest) {
+        // capture everything now (stable), then send after commit
+        String customerEmail = customerEmail(appointment);
+        String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
+
+        Map<String, Object> customerModel = buildCustomerCancelModel(appointment, isGuest);
+        Map<String, Object> adminModel = buildAdminCancelModel(appointment);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM d yyyy h:mm a");
+        String formattedDate = appointment.getAppointmentTime().format(formatter);
+
+        Runnable emailWork = () -> {
+            try {
+                String customerHtml = emailTemplateService.render("cancel-confirmation", customerModel);
+                emailService.sendHtmlEmail(customerEmail, "Appointment canceled", customerHtml);
+
+                String adminHtml = emailTemplateService.render("admin-cancel-notification", adminModel);
+                emailService.sendHtmlEmail(adminEmail, "Appointment canceled - " + formattedDate, adminHtml);
+            } catch (Exception ex) {
+                log.error("Post-commit cancellation email failed. apptId={} msg={}", appointment.getId(), ex.getMessage(), ex);
+            }
+        };
+
+        runAfterCommit(emailWork);
     }
 }

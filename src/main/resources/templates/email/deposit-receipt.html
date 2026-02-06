@@ -60,5 +60,13 @@
     </p>
   </div>
 
+  <div th:if="${isGuest}" style="margin:0 0 16px 0;">
+    <a th:href="${guestCancelUrl}">Cancel appointment</a>
+  </div>
+
+  <div th:if="${!isGuest}" style="margin:0 0 16px 0;">
+    <a th:href="${memberManageUrl}">Manage appointment</a>
+  </div>
+
 </div>
 </html>

@@ -92,6 +92,9 @@ public class Appointment {
     @Column(name = "guest_cancel_token")
     private String guestCancelToken;
 
+    @Column(name = "guest_token_expires_at")
+    private LocalDateTime guestTokenExpiresAt;
+
     @Column(name = "duration_minutes")
     private int durationMinutes;
 

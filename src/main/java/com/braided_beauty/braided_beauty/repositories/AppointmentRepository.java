@@ -96,4 +96,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Appointment a WHERE a.guestCancelToken = :token")
     Optional<Appointment> findByGuestCancelTokenForUpdate(String token);
+
+    @Query("SELECT a FROM Appointment a WHERE a.guestCancelToken = :token")
+    Optional<Appointment> findByGuestCancelToken(String token);
 }

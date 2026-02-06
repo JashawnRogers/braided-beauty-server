@@ -44,6 +44,9 @@ public class LoyaltyRecord {
     @Column(name = "sign_up_bonus_awarded", nullable = false)
     private boolean signupBonusAwarded = false;
 
+//    @Column(name = "free_reschedule_credits")
+//    private int freeRescheduleCredits = 1;
+
     @Version
     private long version;
 

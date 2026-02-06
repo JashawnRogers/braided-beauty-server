@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:replace="email/_layout :: layout(~{::content})">
+
+<div th:fragment="content">
+
+  <h3 style="margin:0 0 12px 0; font-size:18px;">Appointment canceled</h3>
+
+  <p style="margin:0 0 16px 0;">
+    A customer has canceled an appointment.
+  </p>
+
+  <!-- Summary -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="width:100%; border-collapse:collapse; margin-top:12px;">
+    <tr>
+      <td style="padding:6px 0; font-size:14px;">Date</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${#temporals.format(appointmentDateTime, 'MMM d, yyyy h:mm a')}">
+          Jan 31, 2026 2:00 PM
+        </strong>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:6px 0; font-size:14px;">Service</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${serviceName}">Knotless Braids</strong>
+      </td>
+    </tr>
+
+    <tr th:if="${addOns != null && !#lists.isEmpty(addOns)}">
+      <td style="padding:6px 0; font-size:14px; vertical-align:top;">Add-ons</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <div th:each="a : ${addOns}" style="margin:0; padding:0;">
+          <span th:text="${a}">Add-on</span>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td style="padding:6px 0; font-size:14px;">Customer</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${customerName}">Customer</strong>
+      </td>
+    </tr>
+
+    <tr th:if="${customerEmail != null && !#strings.isEmpty(customerEmail)}">
+      <td style="padding:6px 0; font-size:14px;">Email</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <span th:text="${customerEmail}">customer@email.com</span>
+      </td>
+    </tr>
+
+    <tr th:if="${depositAmount != null}">
+      <td style="padding:6px 0; font-size:14px;">Deposit</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <strong th:text="${'$' + #numbers.formatDecimal(depositAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
+      </td>
+    </tr>
+
+    <tr th:if="${customerNote != null && !#strings.isEmpty(customerNote)}">
+      <td style="padding:6px 0; font-size:14px; vertical-align:top;">Note</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <span th:text="${customerNote}">Customer note</span>
+      </td>
+    </tr>
+
+    <tr th:if="${cancelReason != null && !#strings.isEmpty(cancelReason)}">
+      <td style="padding:6px 0; font-size:14px; vertical-align:top;">Reason</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <span th:text="${cancelReason}">Reason</span>
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin-top:18px; padding-top:14px; border-top:1px solid #eee;">
+    <p style="margin:0 0 10px 0; font-weight:bold;">Next steps</p>
+
+    <ul style="margin:0; padding-left:18px;">
+      <li style="margin:0 0 8px 0; font-size:14px; line-height:1.4;">
+        Time slot is now available for booking.
+      </li>
+      <li style="margin:0 0 8px 0; font-size:14px; line-height:1.4;">
+        Deposits are non-refundable per policy.
+      </li>
+    </ul>
+
+    <p style="margin:12px 0 0 0; font-size:14px; line-height:1.4;">
+      You can review details in the admin dashboard.
+    </p>
+
+    <div th:if="${adminDashboardUrl != null && !#strings.isEmpty(adminDashboardUrl)}" style="margin-top:10px;">
+      <a th:href="${adminDashboardUrl}" style="font-size:14px;">Open admin dashboard</a>
+    </div>
+  </div>
+
+</div>
+</html>

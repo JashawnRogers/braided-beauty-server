@@ -33,15 +33,20 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.createAppointment(dto, principal));
     }
 
-    @PostMapping("/guest/cancel")
-    public ResponseEntity<AppointmentResponseDTO> cancelGuestAppointment(@RequestParam("token") String token,
-                                                                         @RequestParam(value = "reason", required = false) String reason) {
+    @PostMapping("/guest/cancel/{token}")
+    public ResponseEntity<AppointmentResponseDTO> cancelGuestAppointment(@PathVariable String token,
+                                                                         @RequestBody String reason) {
         return ResponseEntity.ok(appointmentService.cancelGuestAppointment(token, reason));
     }
 
+    @GetMapping("/guest/{token}")
+    public ResponseEntity<AppointmentResponseDTO> getGuestAppointment(@PathVariable String token) {
+        return ResponseEntity.ok(appointmentService.getGuestAppointmentByToken(token));
+    }
+
     @PatchMapping("/cancel")
-    public ResponseEntity<AppointmentResponseDTO> cancelAppointment(@Valid @RequestBody CancelAppointmentDTO dto) throws StripeException{
-        return ResponseEntity.ok(appointmentService.cancelAppointment(dto));
+    public ResponseEntity<AppointmentResponseDTO> cancelAppointment(@Valid @RequestBody CancelAppointmentDTO dto, @AuthenticationPrincipal AppUserPrincipal principal) {
+        return ResponseEntity.ok(appointmentService.cancelAppointment(dto, principal.id()));
     }
 
     @GetMapping("/{id}")

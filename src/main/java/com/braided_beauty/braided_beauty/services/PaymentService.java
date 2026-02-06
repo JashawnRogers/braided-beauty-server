@@ -326,6 +326,8 @@ public class PaymentService {
                 payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
                 paymentRepository.save(payment);
 
+                String clientType = appointment.getUser() != null ? "Member" : "Guest";
+
                 appointment.setStripeSessionId(session.getId());
                 appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
                 appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
@@ -337,9 +339,14 @@ public class PaymentService {
 
                 Map<String, Object> depositModel = new HashMap<>(base);
                 depositModel.put("remainingAmount", remainingBalance);
+                depositModel.put("isGuest", clientType.equals("Guest"));
+                if (clientType.equals("Guest")) {
+                    depositModel.put("guestCancelUrl", frontendProps.baseUrl() + "/guest/cancel/" + appointment.getGuestCancelToken());
+                } else {
+                    depositModel.put("memberManageUrl", frontendProps.baseUrl());
+                }
 
                 Map<String, Object> adminModel = new HashMap<>();
-                String clientType = appointment.getUser() != null ? "Member" : "Guest";
                 adminModel.put("appointmentDateTime", saved.getAppointmentTime());
                 adminModel.put("clientType", clientType);
                 adminModel.put("serviceName", saved.getService().getName());

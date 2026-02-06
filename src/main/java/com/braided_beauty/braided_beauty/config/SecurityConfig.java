@@ -78,7 +78,7 @@ public class SecurityConfig {
                                 "/api/v1/availability/**",
                                 "/api/v1/auth/**",
                                 "/api/v1/appointments/book",
-                                "/api/v1/appointments/guest/cancel",
+                                "/api/v1/appointments/guest/**",
                                 "/api/v1/appointments/confirm",
                                 "/api/v1/appointments/confirm/by-session",
                                 "/api/v1/appointments/confirm/ics",
