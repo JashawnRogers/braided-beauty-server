@@ -85,6 +85,7 @@ public class SecurityConfig {
                                 "/api/v1/appointments/confirm/ics/by-session",
                                 "/api/v1/business/**",
                                 "/api/v1/email/**",
+                                "/api/v1/hours",
                                 "/error"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhook/stripe").permitAll()
