@@ -18,19 +18,27 @@ public class Payment {
     @Id
     @GeneratedValue
     private UUID id;
+
     @Column(name = "stripe_session_id")
     private String stripeSessionId;
+
     @Column(name = "stripe_payment_intent_id")
     private String stripePaymentIntentId;
+
     @Column(name = "amount")
     private BigDecimal amount;
+
     @Column(name = "tip_amount")
     private BigDecimal tipAmount;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "payment_status")
     private PaymentStatus paymentStatus;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_type")
     private PaymentType paymentType;
+
     @Column(name = "refunded_amount")
     private BigDecimal refundedAmount;
 
