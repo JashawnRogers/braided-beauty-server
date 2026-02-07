@@ -154,6 +154,8 @@ public class AppointmentService {
                 BookingConfirmationToken confirmationToken =
                         appointmentConfirmationService.ensureConfirmationTokenForAppointment(savedNoDepositRequired.getId());
 
+                sendNoDepositBookingEmailsAfterCommit(savedNoDepositRequired);
+
                 return new AppointmentCreateResponseDTO(
                         savedNoDepositRequired.getId(),
                         false,
@@ -416,6 +418,43 @@ public class AppointmentService {
         return m;
     }
 
+    private Map<String, Object> buildCustomerDepositModel(Appointment appointment) {
+        boolean isGuest = appointment.getUser() == null;
+
+        String guestCancelUrl = frontendProps.baseUrl() + "/guest/cancel?token=" + appointment.getGuestCancelToken();
+        String memberManageUrl = frontendProps.baseUrl() + "/dashboard/me/appointments";
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("customerName", displayCustomerName(appointment));
+        m.put("appointmentDateTime", appointment.getAppointmentTime());
+        m.put("serviceName", appointment.getService().getName());
+        m.put("depositAmount", appointment.getDepositAmount());
+        m.put("remainingAmount", appointment.getRemainingBalance());
+        m.put("isGuest", isGuest);
+        m.put("guestCancelUrl", guestCancelUrl);
+        m.put("memberManageUrl", memberManageUrl);
+        m.put("noDepositRequired", true);
+        return m;
+    }
+
+    private Map<String, Object> buildAdminNewAppointmentModel(Appointment appointment) {
+        boolean isGuest = appointment.getUser() == null;
+
+        String adminAppointmentUrl = frontendProps.baseUrl() + "dashboard/admin/appointments/" + appointment.getId();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("appointmentDateTime", appointment.getAppointmentTime());
+        m.put("serviceName", appointment.getService().getName());
+        m.put("addOns", addOnNames(appointment));
+        m.put("clientType", isGuest ? "Guest" : "Member");
+        m.put("customerName", displayCustomerName(appointment));
+        m.put("customerEmail", customerEmail(appointment));
+        m.put("depositAmount", appointment.getDepositAmount());
+        m.put("customerNote", appointment.getNote());
+        m.put("adminAppointmentUrl", adminAppointmentUrl);
+        return m;
+    }
+
     private void sendCancellationEmailsAfterCommit(Appointment appointment, boolean isGuest) {
         // capture everything now (stable), then send after commit
         String customerEmail = customerEmail(appointment);
@@ -440,5 +479,32 @@ public class AppointmentService {
         };
 
         runAfterCommit(emailWork);
+    }
+
+    private void sendNoDepositBookingEmailsAfterCommit(Appointment appointment) {
+        String customerEmail = customerEmail(appointment);
+        String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
+
+        Map<String, Object> customerModel = buildCustomerDepositModel(appointment);
+        Map<String, Object> adminModel = buildAdminNewAppointmentModel(appointment);
+
+        Runnable work = () -> {
+            try {
+                String customerHtml = emailTemplateService.render("deposit-receipt", customerModel);
+                String adminHtml = emailTemplateService.render("admin-new-apt-notification", adminModel);
+
+                emailService.sendHtmlEmail(customerEmail, "Appointment confirmed", customerHtml);
+                emailService.sendHtmlEmail(
+                        adminEmail,
+                        "New Appointment Booked - " + appointment.getAppointmentTime(),
+                        adminHtml
+                );
+            } catch (Exception ex) {
+                log.error("Post-commit no-deposit booking email failed. apptId={} msg={}",
+                        appointment.getId(), ex.getMessage(), ex);
+            }
+        };
+
+        runAfterCommit(work);
     }
 }

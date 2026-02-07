@@ -340,6 +340,7 @@ public class PaymentService {
                 Map<String, Object> depositModel = new HashMap<>(base);
                 depositModel.put("remainingAmount", remainingBalance);
                 depositModel.put("isGuest", clientType.equals("Guest"));
+                depositModel.put("noDepositRequired", false);
                 if (clientType.equals("Guest")) {
                     depositModel.put("guestCancelUrl", frontendProps.baseUrl() + "/guest/cancel/" + appointment.getGuestCancelToken());
                 } else {
@@ -358,7 +359,7 @@ public class PaymentService {
                 adminModel.put("customerEmail", email);
                 adminModel.put("depositAmount", saved.getDepositAmount() != null ? saved.getDepositAmount() : BigDecimal.ZERO);
                 adminModel.put("customerNote", saved.getNote() != null ? saved.getNote() : "");
-                adminModel.put("adminAppointmentUrl", frontendProps.baseUrl() + "/admin/appointment/" + appointment.getId());
+                adminModel.put("adminAppointmentUrl", frontendProps.baseUrl() + "dashboard/admin/appointments/" + appointment.getId());
 
                 String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
 

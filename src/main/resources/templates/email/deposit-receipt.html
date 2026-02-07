@@ -4,7 +4,8 @@
 
 <div th:fragment="content">
 
-  <h3 style="margin:0 0 12px 0; font-size:18px;">Deposit received!</h3>
+  <h3 th:if="${noDepositRequired}" style="margin:0 0 12px 0; font-size:18px;">Appointment confirmed!</h3>
+  <h3 th:unless="${noDepositRequired}" style="margin:0 0 12px 0; font-size:18px;">Deposit received!</h3>
 
   <p style="margin:0 0 12px 0;">
     Hi <strong th:text="${customerName}">Customer</strong>,
