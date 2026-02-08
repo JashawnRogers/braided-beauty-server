@@ -3,18 +3,21 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.BusinessSettings;
+import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AddOnRepository;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
@@ -39,9 +42,9 @@ public class AdminAppointmentService {
     private final AppointmentDtoMapper appointmentDtoMapper;
     private final ServiceRepository serviceRepository;
     private final AddOnRepository addOnRepository;
+    private final PaymentRepository paymentRepository;
     private final FrontendProps frontendProps;
     private final PaymentService paymentService;
-//    private final BusinessSettingsService businessSettingsService;
 
     @Transactional
     public AdminAppointmentSummaryDTO adminCancelAppointment(AdminAppointmentRequestDTO dto) {
@@ -72,6 +75,23 @@ public class AdminAppointmentService {
         Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
                 .orElseThrow(() -> new NotFoundException("Appointment not found with ID: " + dto.getAppointmentId()));
 
+        Payment finalPayment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL)
+                .orElseGet(() -> Payment.builder()
+                        .appointment(appointment)
+                        .paymentType(PaymentType.FINAL)
+                        .build());
+
+        finalPayment.setPaymentMethod(PaymentMethod.CASH);
+        finalPayment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+
+        finalPayment.setStripeSessionId(null);
+        finalPayment.setStripePaymentIntentId(null);
+
+        finalPayment.setAmount(appointment.getTotalAmount());
+        finalPayment.setTipAmount(appointment.getTipAmount());
+
+        paymentRepository.save(finalPayment);
+
         if (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED) {
             throw new ConflictException("Appointment has already been completed");
         }
@@ -85,8 +105,9 @@ public class AdminAppointmentService {
         }
 
         appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-        appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_CASH);
+        appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
         appointment.setUpdatedAt(LocalDateTime.now());
+        appointment.setCompletedAt(LocalDateTime.now());
 
         appointmentRepository.save(appointment);
         return appointmentDtoMapper.toAdminSummaryDTO(appointment);

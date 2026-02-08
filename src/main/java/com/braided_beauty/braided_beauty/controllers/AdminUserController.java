@@ -1,6 +1,5 @@
 package com.braided_beauty.braided_beauty.controllers;
 
-import com.braided_beauty.braided_beauty.dtos.user.admin.UserAdminAnalyticsDTO;
 import com.braided_beauty.braided_beauty.dtos.user.admin.UserSummaryResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
@@ -17,7 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.util.UUID;
 
 @RestController
@@ -63,11 +61,5 @@ public class AdminUserController {
             @PathVariable UUID userId,
             @RequestBody UserType userType) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.updateUserRole(userId, userType));
-    }
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/analytics")
-    public ResponseEntity<UserAdminAnalyticsDTO> getAnalytics(@RequestBody YearMonth yearMonth) {
-        return ResponseEntity.ok(userService.getAnalytics(yearMonth));
     }
 }

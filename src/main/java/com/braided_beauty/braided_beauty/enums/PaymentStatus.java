@@ -14,8 +14,7 @@ package com.braided_beauty.braided_beauty.enums;
 public enum PaymentStatus {
     PENDING_PAYMENT,
     PAID_DEPOSIT,
-    PAID_IN_FULL_ACH,
-    PAID_IN_FULL_CASH,
+    PAID_IN_FULL,
     PAYMENT_FAILED,
     REFUNDED,
     NO_DEPOSIT_REQUIRED,

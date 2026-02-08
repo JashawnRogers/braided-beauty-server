@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.repositories;
 
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import javax.swing.text.html.Option;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -99,4 +101,58 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
     @Query("SELECT a FROM Appointment a WHERE a.guestCancelToken = :token")
     Optional<Appointment> findByGuestCancelToken(String token);
+
+    long countByAppointmentStatusAndCompletedAtBetween(
+            AppointmentStatus status,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    long countByAppointmentStatusAndCompletedAtIsNotNull(AppointmentStatus status);
+
+    @Query("""
+        select coalesce(sum(a.totalAmount), 0)
+        from Appointment a
+        where a.appointmentStatus = :status
+          and a.completedAt is not null
+          and a.completedAt between :start and :end
+          and a.stripePaymentId is not null
+    """)
+    BigDecimal sumCardTotalByCompletedBetween(
+            @Param("status") AppointmentStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+        select coalesce(sum(a.totalAmount), 0)
+        from Appointment a
+        where a.appointmentStatus = :status
+          and a.completedAt is not null
+          and a.completedAt between :start and :end
+          and a.stripePaymentId is null
+    """)
+    BigDecimal sumCashTotalByCompletedBetween(
+            @Param("status") AppointmentStatus status,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+        select coalesce(sum(a.totalAmount), 0)
+        from Appointment a
+        where a.appointmentStatus = :status
+          and a.completedAt is not null
+          and a.stripePaymentId is not null
+    """)
+    BigDecimal sumCardTotalAllTime(@Param("status") AppointmentStatus status);
+
+    @Query("""
+        select coalesce(sum(a.totalAmount), 0)
+        from Appointment a
+        where a.appointmentStatus = :status
+          and a.completedAt is not null
+          and a.stripePaymentId is null
+    """)
+    BigDecimal sumCashTotalAllTime(@Param("status") AppointmentStatus status);
 }

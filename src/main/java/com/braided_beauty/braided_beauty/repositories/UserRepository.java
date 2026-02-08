@@ -17,4 +17,5 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     boolean existsByEmail(String email);
     boolean existsByOauthProviderAndOauthSubject(String oAuthProvider, String oAuthSubject);
     Optional<User> findByOauthProviderAndOauthSubject(String oAuthProvider, String oAuthSubject);
+    long countByUserType(UserType userType);
 }

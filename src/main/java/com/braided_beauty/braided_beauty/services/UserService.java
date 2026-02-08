@@ -115,38 +115,6 @@ public class UserService {
                 .map(userAdminMapper::toSummaryDTO);
     }
 
-    public UserAdminAnalyticsDTO getAnalytics(YearMonth yearMonth){
-        LocalDateTime start = yearMonth.atDay(1).atStartOfDay();
-        LocalDateTime end = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
-        List<AppointmentResponseDTO> appointmentsByMonth = appointmentRepository.findAllByCreatedAtBetweenOrderByCreatedAtAsc(start,end)
-                .stream()
-                .map(appointmentDtoMapper::toDTO)
-                .toList();
-
-        int totalAppointmentsAllTime = appointmentRepository.findAll().size();
-        List<UserSummaryResponseDTO> newUsersThisMonth = userRepository.findAllByCreatedAtBetweenOrderByCreatedAtAsc(start, end)
-                .stream()
-                .map(userAdminMapper::toSummaryDTO)
-                .toList();
-
-        ServiceModel mostPopularService = serviceRepository.findTopByOrderByTimesBookedDesc()
-                .orElseThrow(() -> new NotFoundException("Service not found."));
-
-        int loyaltyMembers = userRepository.findAllByUserType(UserType.MEMBER).size();
-
-        // New clients?
-        // NEW - appointmentCount = 1
-        // Returning clients?
-        // Returning - appointmentCount > 1
-
-        return UserAdminAnalyticsDTO.builder()
-                .totalAppointmentsByMonth(appointmentsByMonth)
-                .totalAppointmentsAllTime(totalAppointmentsAllTime)
-                .uniqueClientsThisMonth(newUsersThisMonth)
-                .mostPopularService(serviceDtoMapper.toMostPopularServiceDto(mostPopularService))
-                .totalLoyaltyMembers(loyaltyMembers)
-                .build();
-    }
 
     public UserSummaryResponseDTO updateUserRole(UUID userId, UserType userType){
         User user = userRepository.findById(userId)

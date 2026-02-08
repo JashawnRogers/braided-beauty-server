@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
@@ -26,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.lang.String;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -73,7 +75,7 @@ public class PaymentService {
                 .ifPresent(existing -> {
                     if (existing.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
                             || existing.getPaymentStatus() == PaymentStatus.REFUNDED
-                            || existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH) {
+                            || existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL) {
                         throw new IllegalStateException("Deposit already processed for appointment " + appointment.getId());
                     }
                 });
@@ -126,6 +128,7 @@ public class PaymentService {
                 .stripePaymentIntentId(session.getPaymentIntent())
                 .amount(deposit)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
+                .paymentMethod(PaymentMethod.CARD)
                 .paymentType(PaymentType.DEPOSIT)
                 .appointment(appointment)
                 .user(appointment.getUser())
@@ -147,7 +150,7 @@ public class PaymentService {
         Optional<Payment> existingFinalOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL);
         if (existingFinalOpt.isPresent()) {
             Payment existing = existingFinalOpt.get();
-            if (existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH
+            if (existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL
                     || existing.getPaymentStatus() == PaymentStatus.REFUNDED) {
                 throw new IllegalStateException("Final payment already processed for appointment " + appointment.getId());
             }
@@ -232,6 +235,7 @@ public class PaymentService {
                 .amount(finalAmount)
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
+                .paymentMethod(PaymentMethod.CARD)
                 .paymentType(PaymentType.FINAL)
                 .appointment(appointment)
                 .user(appointment.getUser())
@@ -288,7 +292,7 @@ public class PaymentService {
         }
         if ("final".equals(paymentType)
                 && (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED
-                || appointment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH)) {
+                || appointment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL)) {
             log.info("Final payment already processed for appointment {}", appointmentId);
             return;
         }
@@ -298,7 +302,7 @@ public class PaymentService {
 
         // Idempotency: if this payment row already reflects a successful processing, do nothing.
         if (payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
-                || payment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL_ACH
+                || payment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL
                 || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
             log.info("Payment already processed for session {} (status={})", session.getId(), payment.getPaymentStatus());
             return;
@@ -324,6 +328,9 @@ public class PaymentService {
         switch (payment.getPaymentType()) {
             case DEPOSIT -> {
                 payment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+                payment.setPaymentMethod(PaymentMethod.CARD);
+                payment.setStripePaymentIntentId(session.getPaymentIntent());
+                payment.setStripeSessionId(session.getId());
                 paymentRepository.save(payment);
 
                 String clientType = appointment.getUser() != null ? "Member" : "Guest";
@@ -387,12 +394,16 @@ public class PaymentService {
                 log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
             }
             case FINAL -> {
-                payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
+                payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+                payment.setStripePaymentIntentId(session.getPaymentIntent());
+                payment.setStripeSessionId(session.getId());
+                payment.setPaymentMethod(PaymentMethod.CARD);
                 paymentRepository.save(payment);
 
                 appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
-                appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL_ACH);
+                appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
                 appointment.setRemainingBalance(BigDecimal.ZERO);
+                appointment.setCompletedAt(LocalDateTime.now());
 
                 if (appointment.getUser() == null) {
                     log.info("Skipping loyalty reward (guest appointment {})", appointmentId);

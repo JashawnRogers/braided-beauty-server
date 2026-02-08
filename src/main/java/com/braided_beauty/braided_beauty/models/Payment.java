@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.models;
 
+import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
 import jakarta.persistence.*;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
+@Table(name = "payment")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -38,6 +40,10 @@ public class Payment {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_type")
     private PaymentType paymentType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
 
     @Column(name = "refunded_amount")
     private BigDecimal refundedAmount;
