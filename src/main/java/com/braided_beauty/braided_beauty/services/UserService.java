@@ -131,7 +131,7 @@ public class UserService {
     }
 
     @Transactional // <-- Allows JPA to push pending changes to DB
-    public UserMemberProfileResponseDTO updateMemberDataByAdmin(UUID id,UserMemberRequestDTO dto) {
+    public UserMemberProfileResponseDTO updateMemberDataByAdmin(UUID id, UserMemberRequestDTO dto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User does not exist"));
         userRepository.save(UserMemberDtoMapper.toEntity(user, dto));

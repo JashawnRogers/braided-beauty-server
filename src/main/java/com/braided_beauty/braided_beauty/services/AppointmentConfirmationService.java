@@ -124,7 +124,9 @@ public class AppointmentConfirmationService {
                 appointment.getRemainingBalance(),
                 appointment.getTipAmount(),
                 addOns,
-                appointment.getTotalAmount()
+                appointment.getTotalAmount(),
+                appointment.getDiscountAmount(),
+                appointment.getDiscountPercent()
         );
     }
 
@@ -153,7 +155,9 @@ public class AppointmentConfirmationService {
                 appointment.getRemainingBalance(),
                 appointment.getTipAmount(),
                 addOns,
-                appointment.getTotalAmount()
+                appointment.getTotalAmount(),
+                appointment.getDiscountAmount(),
+                appointment.getDiscountPercent()
         );
     }
 

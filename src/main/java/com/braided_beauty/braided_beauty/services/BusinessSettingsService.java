@@ -5,10 +5,14 @@ import com.braided_beauty.braided_beauty.records.BusinessSettingsDTO;
 import com.braided_beauty.braided_beauty.repositories.BusinessSettingsRepository;
 import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
+@Slf4j
 @Service
 @AllArgsConstructor
 public class BusinessSettingsService {
@@ -17,6 +21,7 @@ public class BusinessSettingsService {
     @Transactional
     public BusinessSettingsDTO updateSettings(BusinessSettingsDTO dto) {
         BusinessSettings settings = getOrCreate();
+        int ambassadorPercentage = Optional.ofNullable(dto.ambassadorDiscountPercent()).orElse(0);
 
         if (dto.appointmentBufferTime() != null) {
             settings.setAppointmentBufferTime(dto.appointmentBufferTime());
@@ -36,12 +41,20 @@ public class BusinessSettingsService {
             settings.setCompanyPhoneNumber(normalizedPhoneNumber);
         }
 
+        if (ambassadorPercentage > 0 && ambassadorPercentage < 100) {
+            settings.setAmbassadorDiscountPercent(ambassadorPercentage);
+        }
+
+
         BusinessSettings saved = repository.save(settings);
+
+        log.info("Ambassador Discount Percentage d={}", saved.getAmbassadorDiscountPercent());
         return BusinessSettingsDTO.builder()
                 .appointmentBufferTime(saved.getAppointmentBufferTime())
                 .companyAddress(saved.getCompanyAddress())
                 .companyEmail(saved.getCompanyEmail())
                 .companyPhoneNumber(saved.getCompanyPhoneNumber())
+                .ambassadorDiscountPercent(saved.getAmbassadorDiscountPercent())
                 .build();
     }
 
@@ -53,6 +66,7 @@ public class BusinessSettingsService {
                 .companyAddress(settings.getCompanyAddress())
                 .companyEmail(settings.getCompanyEmail())
                 .companyPhoneNumber(settings.getCompanyPhoneNumber())
+                .ambassadorDiscountPercent(settings.getAmbassadorDiscountPercent())
                 .build();
     }
 

@@ -17,6 +17,8 @@ public record ConfirmationReceiptDTO(
         BigDecimal remainingBalance,
         BigDecimal tipAmount,
         List<AddOnResponseDTO> addOns,
-        BigDecimal totalAmount
+        BigDecimal totalAmount,
+        BigDecimal discountAmount,
+        Integer discountPercent
 ) {
 }

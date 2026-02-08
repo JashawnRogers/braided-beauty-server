@@ -43,7 +43,7 @@ public class AdminUserController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{userId}")
+    @PatchMapping("/{userId}")
     public ResponseEntity<UserMemberProfileResponseDTO> updateMemberDataByAdmin(@PathVariable UUID userId, @RequestBody UserMemberRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.OK).body(userService.updateMemberDataByAdmin(userId, dto));
     }

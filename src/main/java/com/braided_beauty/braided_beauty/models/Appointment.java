@@ -76,6 +76,12 @@ public class Appointment {
     @Column(name = "total_amount")
     private BigDecimal totalAmount; // = amount of base service + any add-ons + tip
 
+    @Column(name = "discount_amount")
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "discount_percent")
+    private Integer discountPercent = 0;
+
     @Column(name = "payment_status", nullable = false)
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;

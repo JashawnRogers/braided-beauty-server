@@ -11,5 +11,6 @@ public record BusinessSettingsDTO(
         String companyPhoneNumber,
         String companyAddress,
         @Email String companyEmail,
-        @Min(0) Integer appointmentBufferTime
+        @Min(0) Integer appointmentBufferTime,
+        @Min(0) Integer ambassadorDiscountPercent
 ) { }

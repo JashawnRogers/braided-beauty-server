@@ -64,11 +64,17 @@ public class AppointmentService {
     private final FrontendProps frontendProps;
 
     @Transactional
-    public AppointmentCreateResponseDTO createAppointment(AppointmentRequestDTO dto, AppUserPrincipal principal) throws StripeException {
+    public AppointmentCreateResponseDTO createAppointment(
+            AppointmentRequestDTO dto,
+            AppUserPrincipal principal
+    ) throws StripeException {
+
         ServiceModel service = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
 
         appointmentRepository.lockSchedule();
+
+        BusinessSettings settings = businessSettingsService.getOrCreate();
 
         int bufferMinutes = businessSettingsService.getAppointmentBufferMinutes();
         LocalDateTime start = dto.getAppointmentTime();
@@ -83,16 +89,20 @@ public class AppointmentService {
             appointment.setGuestEmail(null);
         } else {
             String email = dto.getReceiptEmail();
-            if (email == null || email.isBlank()) throw new IllegalArgumentException("Guest booking requires a receipt email");
+            if (email == null || email.isBlank()) {
+                throw new IllegalArgumentException("Guest booking requires a receipt email");
+            }
             appointment.setUser(null);
             appointment.setGuestEmail(email);
             appointment.setGuestCancelToken(UUID.randomUUID().toString());
-            appointment.setGuestTokenExpiresAt(appointment.getAppointmentTime());
+            appointment.setGuestTokenExpiresAt(appointment.getAppointmentTime()); // keeping your current behavior
         }
 
         boolean hasUser = appointment.getUser() != null;
         boolean hasGuestEmail = appointment.getGuestEmail() != null && !appointment.getGuestEmail().isBlank();
-        if (hasUser == hasGuestEmail) throw new IllegalStateException("Must have exactly one: user or guest email");
+        if (hasUser == hasGuestEmail) {
+            throw new IllegalStateException("Must have exactly one: user or guest email");
+        }
 
         // ----- service + add-ons -----
         appointment.setService(service);
@@ -100,10 +110,8 @@ public class AppointmentService {
         List<AddOn> addOns = new ArrayList<>();
         if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
             addOns = addOnService.getAddOnIds(dto.getAddOnIds());
-            appointment.setAddOns(addOns);
-        } else {
-            appointment.setAddOns(new ArrayList<>());
         }
+        appointment.setAddOns(addOns);
 
         int addOnMinutes = addOns.stream()
                 .map(AddOn::getDurationMinutes)
@@ -119,36 +127,89 @@ public class AppointmentService {
         int durationMinutes = (service.getDurationMinutes() == null ? 0 : service.getDurationMinutes()) + addOnMinutes;
         appointment.setDurationMinutes(durationMinutes);
 
-        // ----- conflict check uses duration + buffer -----
+        // ----- conflict check -----
         LocalDateTime end = start.plusMinutes(durationMinutes + bufferMinutes);
-
         List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
-        if (!conflicts.isEmpty()) throw new ConflictException("This time overlaps with another appointment.");
+        if (!conflicts.isEmpty()) {
+            throw new ConflictException("This time overlaps with another appointment.");
+        }
 
-        // ----- status/payment -----
-        BigDecimal total = addOnsTotal
-                .add(service.getPrice())
+        // ----- PRICING BASELINE (single source of truth) -----
+        BigDecimal servicePrice = Objects.requireNonNullElse(service.getPrice(), BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal deposit = total
+        BigDecimal subtotal = servicePrice
+                .add(Objects.requireNonNullElse(addOnsTotal, BigDecimal.ZERO))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal deposit = subtotal
                 .multiply(new BigDecimal("0.20"))
                 .setScale(2, RoundingMode.HALF_UP);
 
+        BigDecimal remainingBeforeDiscount = subtotal
+                .subtract(deposit)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // --- Discount applies ONLY if ambassador ---
+        int pct = Math.max(
+                0,
+                Math.min(100, Objects.requireNonNullElse(settings.getAmbassadorDiscountPercent(), 0))
+        );
+
+        boolean isAmbassador =
+                appointment.getUser() != null
+                        && appointment.getUser().getUserType() == UserType.AMBASSADOR
+                        && pct > 0;
+
+        BigDecimal discountAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (isAmbassador && remainingBeforeDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            // compute discount on FINAL portion only (remaining balance)
+            discountAmount = computeAmbassadorDiscount(remainingBeforeDiscount, pct)
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (discountAmount.compareTo(remainingBeforeDiscount) > 0) {
+                discountAmount = remainingBeforeDiscount;
+            }
+        }
+
+        BigDecimal remainingAfterDiscount = remainingBeforeDiscount
+                .subtract(discountAmount)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (remainingAfterDiscount.compareTo(BigDecimal.ZERO) < 0) {
+            remainingAfterDiscount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // Persist baseline fields
+        appointment.setCreatedAt(LocalDateTime.now());
+
         appointment.setDepositAmount(deposit);
-        appointment.setTotalAmount(total);
+        appointment.setTipAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+
+        appointment.setDiscountPercent(isAmbassador ? pct : 0);
+        appointment.setDiscountAmount(discountAmount);
+
+        // IMPORTANT:
+        // totalAmount = subtotal - discount (tip is added later at final payment / cash completion)
+        appointment.setTotalAmount(
+                subtotal.subtract(discountAmount).setScale(2, RoundingMode.HALF_UP)
+        );
+
+        // IMPORTANT:
+        // remainingBalance becomes the amount still owed AFTER discount and AFTER deposit.
+        appointment.setRemainingBalance(remainingAfterDiscount);
 
         // -------------------------------
-        // TRY/CATCH #1: save appointment row
+        // save appointment row (+ create deposit session if needed)
         // -------------------------------
         try {
             if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
                 appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
                 appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
                 appointment.setHoldExpiresAt(null);
-                appointment.setCreatedAt(LocalDateTime.now());
-                appointment.setRemainingBalance(BigDecimal.ZERO);
 
-                // Force constraint failure to happen inside THIS method
+                // If there is no deposit, the "remaining balance" should be 0 (nothing owed now).
+                appointment.setRemainingBalance(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+
                 Appointment savedNoDepositRequired = appointmentRepository.saveAndFlush(appointment);
 
                 BookingConfirmationToken confirmationToken =
@@ -162,34 +223,27 @@ public class AppointmentService {
                         null,
                         confirmationToken.token()
                 );
-            } else {
-                appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
-                appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
-                appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
-                appointment.setRemainingBalance(total.subtract(deposit).setScale(2, RoundingMode.HALF_UP));
-                appointment.setCreatedAt(LocalDateTime.now());
-
-                // Force constraint failure here too
-                Appointment saved = appointmentRepository.saveAndFlush(appointment);
-
-                // ----- Call payment service after save -----
-                String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
-                String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
-
-                Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
-
-                // -------------------------------
-                // TRY/CATCH #2 is NOT required for unique time
-                // (this is an UPDATE, not a new appointment_time insert)
-                // -------------------------------
-                saved.setStripeSessionId(session.getId());
-                appointmentRepository.save(saved);
-
-                return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
             }
+
+            // Deposit required
+            appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+            appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
+            appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
+
+            Appointment saved = appointmentRepository.saveAndFlush(appointment);
+
+            String successUrl = frontendProps.baseUrl() + "/book/success?session_id={CHECKOUT_SESSION_ID}";
+            String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + saved.getId();
+
+            Session session = paymentService.createDepositCheckoutSession(saved, successUrl, cancelUrl);
+
+            saved.setStripeSessionId(session.getId());
+            appointmentRepository.save(saved);
+
+            return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
+
         } catch (DataIntegrityViolationException ex) {
             if (isAppointmentTimeUniqueViolation(ex)) {
-
                 throw new ConflictException("That time was just booked. Please pick another time.");
             }
             throw ex;
@@ -506,5 +560,12 @@ public class AppointmentService {
         };
 
         runAfterCommit(work);
+    }
+
+    private BigDecimal computeAmbassadorDiscount(BigDecimal remainingBalance, int percent) {
+        if (percent <= 0) return BigDecimal.ZERO;
+        return remainingBalance
+                .multiply(BigDecimal.valueOf(percent))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 }

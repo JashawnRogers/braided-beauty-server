@@ -1,0 +1,5 @@
+ALTER TABLE appointments
+ADD COLUMN discount_percent INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE appointments
+ADD COLUMN discount_amount NUMERIC(10,2) NOT NULL DEFAULT 0;

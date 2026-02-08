@@ -61,7 +61,14 @@
         </tr>
 
         <tr th:if="${discountAmount != null and discountAmount.signum() != 0}">
-            <td style="padding:6px 0; font-size:14px;">Discount</td>
+            <td style="padding:6px 0; font-size:14px;">
+                Discount
+                <span th:if="${discountPercent != null and discountPercent != 0}"
+                      th:text="${' (' + discountPercent + '%)'}"
+                      style="color:#777; font-size:13px;">
+                    (0%)
+                </span>
+            </td>
             <td align="right" style="padding:6px 0; font-size:14px;">
                 -<span th:text="${'$' + #numbers.formatDecimal(discountAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>

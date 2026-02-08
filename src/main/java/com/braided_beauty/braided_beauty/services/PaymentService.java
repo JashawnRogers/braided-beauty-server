@@ -1,15 +1,13 @@
 package com.braided_beauty.braided_beauty.services;
 
-import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
-import com.braided_beauty.braided_beauty.enums.PaymentMethod;
-import com.braided_beauty.braided_beauty.enums.PaymentStatus;
-import com.braided_beauty.braided_beauty.enums.PaymentType;
+import com.braided_beauty.braided_beauty.enums.*;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
+import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Refund;
@@ -37,6 +35,7 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final AppointmentRepository appointmentRepository;
+    private final ServiceRepository serviceRepository;
     private final LoyaltyService loyaltyService;
     private final AppointmentConfirmationService appointmentConfirmationService;
     private final EmailTemplateService emailTemplateService;
@@ -141,13 +140,20 @@ public class PaymentService {
     }
 
     @Transactional
-    public Session createFinalPaymentSession(Appointment appointment, String successUrl, String cancelUrl, BigDecimal tipAmount) throws StripeException {
-        if (tipAmount == null) {
-            tipAmount = BigDecimal.ZERO;
-        }
+    public Session createFinalPaymentSession(
+            Appointment appointment,
+            String successUrl,
+            String cancelUrl,
+            BigDecimal tipAmount
+    ) throws StripeException {
 
-        // Idempotency guard: reuse an existing pending final-payment session; block if already paid.
-        Optional<Payment> existingFinalOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL);
+        tipAmount = Objects.requireNonNullElse(tipAmount, BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // --- idempotency guard ---
+        Optional<Payment> existingFinalOpt =
+                paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL);
+
         if (existingFinalOpt.isPresent()) {
             Payment existing = existingFinalOpt.get();
             if (existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL
@@ -155,53 +161,117 @@ public class PaymentService {
                 throw new IllegalStateException("Final payment already processed for appointment " + appointment.getId());
             }
             if (existing.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT && existing.getStripeSessionId() != null) {
-                log.info("Reusing existing final-payment checkout session {} for appointment {}", existing.getStripeSessionId(), appointment.getId());
+                log.info("Reusing existing final-payment checkout session {} for appointment {}",
+                        existing.getStripeSessionId(), appointment.getId());
                 return Session.retrieve(existing.getStripeSessionId());
             }
         }
 
-        BigDecimal remainingBalance = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO);
-        BigDecimal finalAmount = remainingBalance.add(tipAmount);
-        appointment.setTotalAmount(appointment.getTotalAmount().add(tipAmount));
-        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        // ✅ Source of truth: appointment.remainingBalance is already AFTER discount and AFTER deposit.
+        BigDecimal remainingDue = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
 
-        if (remainingBalance.compareTo(BigDecimal.ZERO) <= 0) {
+        if (remainingDue.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("No remaining balance to pay");
         }
 
-        List<SessionCreateParams.LineItem> lineItems = Stream.of(
+        BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        int discountPercent = Math.max(0, Objects.requireNonNullElse(appointment.getDiscountPercent(), 0));
+
+        // For display only (what remaining would have been BEFORE discount)
+        BigDecimal remainingBeforeDiscount = remainingDue.add(discountAmount).setScale(2, RoundingMode.HALF_UP);
+
+        // Stripe charge = remaining due + tip
+        BigDecimal finalAmountCharged = remainingDue.add(tipAmount).setScale(2, RoundingMode.HALF_UP);
+        if (finalAmountCharged.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("No amount due for appointment " + appointment.getId());
+        }
+
+        // Update appointment totals (discount already included; just add tip + recompute totalAmount)
+        BigDecimal servicePrice = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal addOnsTotal = appointment.getAddOns().stream()
+                .map(AddOn::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal subtotal = servicePrice.add(addOnsTotal).setScale(2, RoundingMode.HALF_UP);
+
+        appointment.setTipAmount(tipAmount);
+
+        // totalAmount = subtotal - discount + tip
+        appointment.setTotalAmount(
+                subtotal.subtract(discountAmount).add(tipAmount).setScale(2, RoundingMode.HALF_UP)
+        );
+
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+
+        // --- Stripe line items (must be NON-NEGATIVE) ---
+        // We charge the discounted remaining due, and describe the discount.
+        String remainingLabel = "Remaining balance: " + appointment.getService().getName();
+
+        String remainingDescription = null;
+        if (discountAmount.compareTo(BigDecimal.ZERO) > 0 && discountPercent > 0) {
+            remainingLabel = "Remaining balance (after " + discountPercent + "% ambassador discount)";
+            remainingDescription =
+                    "Original remaining: $" + remainingBeforeDiscount
+                            + " | Discount: -$" + discountAmount
+                            + " | Due now: $" + remainingDue;
+        }
+
+        List<SessionCreateParams.LineItem> lineItems = new ArrayList<>();
+
+        // Remaining due line item
+        SessionCreateParams.LineItem.PriceData.ProductData.Builder productBuilder =
+                SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                        .setName(remainingLabel);
+
+        if (remainingDescription != null) {
+            productBuilder.setDescription(remainingDescription);
+        }
+
+        long remainingCents = remainingDue.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
+        if (remainingCents < 0) {
+            throw new IllegalStateException("Remaining balance became negative; check discount math on booking.");
+        }
+
+        lineItems.add(
                 SessionCreateParams.LineItem.builder()
                         .setQuantity(1L)
                         .setPriceData(
                                 SessionCreateParams.LineItem.PriceData.builder()
                                         .setCurrency("usd")
-                                        .setUnitAmount(remainingBalance.movePointRight(2).longValueExact())
-                                        .setProductData(
-                                                SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                        .setName("Remaining balance: " + appointment.getService().getName())
-                                                        .build()
-                                        )
+                                        .setUnitAmount(remainingCents)
+                                        .setProductData(productBuilder.build())
                                         .build()
                         )
-                        .build(),
+                        .build()
+        );
 
-                // Tip amount line item (optional)
-                tipAmount.compareTo(BigDecimal.ZERO) > 0 ?
-                        SessionCreateParams.LineItem.builder()
-                                .setQuantity(1L)
-                                .setPriceData(
-                                        SessionCreateParams.LineItem.PriceData.builder()
-                                                .setCurrency("usd")
-                                                .setUnitAmount(tipAmount.movePointRight(2).longValueExact())
-                                                .setProductData(
-                                                        SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                                .setName("Tip")
-                                                                .build()
-                                                )
-                                                .build()
-                                )
-                                .build() : null
-        ).filter(Objects::nonNull).toList(); // Prevents null line item crash
+        // Tip line item (optional)
+        if (tipAmount.compareTo(BigDecimal.ZERO) > 0) {
+            long tipCents = tipAmount.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
+            lineItems.add(
+                    SessionCreateParams.LineItem.builder()
+                            .setQuantity(1L)
+                            .setPriceData(
+                                    SessionCreateParams.LineItem.PriceData.builder()
+                                            .setCurrency("usd")
+                                            .setUnitAmount(tipCents)
+                                            .setProductData(
+                                                    SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                            .setName("Tip")
+                                                            .build()
+                                            )
+                                            .build()
+                            )
+                            .build()
+            );
+        }
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
@@ -212,27 +282,27 @@ public class PaymentService {
                 .putMetadata("paymentType", "final")
                 .addAllLineItem(lineItems)
                 .setPaymentIntentData(
-                    SessionCreateParams.PaymentIntentData.builder()
-                            .putMetadata("appointmentId", appointment.getId().toString())
-                            .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
-                            .putMetadata("tipAmount", tipAmount.toString())
-                            .putMetadata("paymentType", "final")
-                            .putMetadata("remainingBalance", remainingBalance.toString())
-                            .putMetadata("finalAmount", finalAmount.toString())
-                            .build()
+                        SessionCreateParams.PaymentIntentData.builder()
+                                .putMetadata("appointmentId", appointment.getId().toString())
+                                .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
+                                .putMetadata("paymentType", "final")
+                                .putMetadata("tipAmount", tipAmount.toString())
+                                // echo what the appointment already decided
+                                .putMetadata("discountPercent", String.valueOf(discountPercent))
+                                .putMetadata("discountAmount", discountAmount.toString())
+                                .putMetadata("remainingBalanceBeforeDiscount", remainingBeforeDiscount.toString())
+                                .putMetadata("remainingBalanceDue", remainingDue.toString())
+                                .putMetadata("finalAmountCharged", finalAmountCharged.toString())
+                                .build()
                 )
                 .build();
-
-        if (lineItems.isEmpty()) {
-            throw new IllegalArgumentException("No amount due for appointment " + appointment.getId());
-        }
 
         Session session = Session.create(params);
 
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
                 .stripePaymentIntentId(session.getPaymentIntent())
-                .amount(finalAmount)
+                .amount(finalAmountCharged) // actual Stripe charge for final session
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentMethod(PaymentMethod.CARD)
@@ -241,9 +311,10 @@ public class PaymentService {
                 .user(appointment.getUser())
                 .build();
 
+        appointmentRepository.save(appointment);
         paymentRepository.save(payment);
-        log.info("Created Stripe checkout session for final payment. Session ID: {}", session.getId());
 
+        log.info("Created Stripe checkout session for final payment. Session ID: {}", session.getId());
         return session;
     }
 
@@ -343,6 +414,7 @@ public class PaymentService {
                 appointment.setLoyaltyApplied(false);
                 Appointment saved = appointmentRepository.save(appointment);
                 service.setTimesBooked(service.getTimesBooked() + 1);
+                serviceRepository.save(service);
 
                 Map<String, Object> depositModel = new HashMap<>(base);
                 depositModel.put("remainingAmount", remainingBalance);
@@ -394,12 +466,31 @@ public class PaymentService {
                 log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
             }
             case FINAL -> {
+                // capture BEFORE you mutate appointment
+                BigDecimal remainingBeforeDiscount =
+                        Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO);
+
+                BigDecimal serviceAmount = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO);
+                BigDecimal subtotal = addOnsTotal.add(serviceAmount);
+
+                BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO);
+                BigDecimal depositAmount = Objects.requireNonNullElse(appointment.getDepositAmount(), BigDecimal.ZERO);
+                BigDecimal tip = Objects.requireNonNullElse(appointment.getTipAmount(), BigDecimal.ZERO);
+                int discountPercent = Objects.requireNonNullElse(appointment.getDiscountPercent(), 0);
+
+                BigDecimal chargedToday = remainingBeforeDiscount.subtract(discountAmount).add(tip);
+                if (chargedToday.compareTo(BigDecimal.ZERO) < 0) chargedToday = BigDecimal.ZERO;
+
+                BigDecimal totalPaid = depositAmount.add(chargedToday);
+
+                // NOW update Payment row
                 payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
                 payment.setStripePaymentIntentId(session.getPaymentIntent());
                 payment.setStripeSessionId(session.getId());
                 payment.setPaymentMethod(PaymentMethod.CARD);
                 paymentRepository.save(payment);
 
+                // NOW update Appointment
                 appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
                 appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
                 appointment.setRemainingBalance(BigDecimal.ZERO);
@@ -418,15 +509,16 @@ public class PaymentService {
                 appointmentRepository.save(appointment);
 
                 Map<String, Object> finalModel = new HashMap<>(base);
-                finalModel.put("serviceAmount", appointment.getService().getPrice());
+                finalModel.put("serviceAmount", serviceAmount);
                 finalModel.put("addOns", addOnLines);
-                finalModel.put("subtotal", addOnsTotal.add(service.getPrice()));
-                finalModel.put("discountAmount", BigDecimal.ZERO);
-                finalModel.put("chargedToday", appointment.getTotalAmount().subtract(appointment.getDepositAmount()));
-                finalModel.put("totalPaid", appointment.getTotalAmount());
-                if (appointment.getTipAmount() != null) {
-                    finalModel.put("tipAmount", appointment.getTipAmount());
-                }
+                finalModel.put("subtotal", subtotal);
+                finalModel.put("discountAmount", discountAmount);
+                finalModel.put("discountPercent", discountPercent);
+                finalModel.put("depositAmount", depositAmount);
+                finalModel.put("tipAmount", tip);
+                finalModel.put("chargedToday", chargedToday);
+                finalModel.put("totalPaid", totalPaid);
+
 
                 afterCommitEmailWork = () -> {
                     try {
@@ -485,4 +577,5 @@ public class PaymentService {
         appointmentRepository.save(appointment);
         log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, session.getPaymentIntent());
     }
+
 }

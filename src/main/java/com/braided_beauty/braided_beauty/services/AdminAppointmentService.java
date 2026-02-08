@@ -30,8 +30,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -75,23 +77,6 @@ public class AdminAppointmentService {
         Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
                 .orElseThrow(() -> new NotFoundException("Appointment not found with ID: " + dto.getAppointmentId()));
 
-        Payment finalPayment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL)
-                .orElseGet(() -> Payment.builder()
-                        .appointment(appointment)
-                        .paymentType(PaymentType.FINAL)
-                        .build());
-
-        finalPayment.setPaymentMethod(PaymentMethod.CASH);
-        finalPayment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
-
-        finalPayment.setStripeSessionId(null);
-        finalPayment.setStripePaymentIntentId(null);
-
-        finalPayment.setAmount(appointment.getTotalAmount());
-        finalPayment.setTipAmount(appointment.getTipAmount());
-
-        paymentRepository.save(finalPayment);
-
         if (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED) {
             throw new ConflictException("Appointment has already been completed");
         }
@@ -100,12 +85,60 @@ public class AdminAppointmentService {
             appointment.setNote(dto.getNote().trim());
         }
 
+        // Tip can be set/updated at completion time
         if (dto.getTipAmount() != null) {
-            appointment.setTipAmount(dto.getTipAmount());
+            appointment.setTipAmount(dto.getTipAmount().setScale(2, RoundingMode.HALF_UP));
         }
+
+        BigDecimal tip = Objects.requireNonNullElse(appointment.getTipAmount(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // Source of truth: remainingBalance is already AFTER discount (and after deposit)
+        BigDecimal remainingDue = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal cashFinalAmount = remainingDue.add(tip).setScale(2, RoundingMode.HALF_UP);
+        if (cashFinalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            cashFinalAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        Payment finalPayment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL)
+                .orElseGet(() -> Payment.builder()
+                        .appointment(appointment)
+                        .paymentType(PaymentType.FINAL)
+                        .user(appointment.getUser())
+                        .build());
+
+        finalPayment.setPaymentMethod(PaymentMethod.CASH);
+        finalPayment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+        finalPayment.setStripeSessionId(null);
+        finalPayment.setStripePaymentIntentId(null);
+        finalPayment.setTipAmount(tip);
+        finalPayment.setAmount(cashFinalAmount);
+
+        paymentRepository.save(finalPayment);
+
+        // Keep appointment totals consistent for admin UI / receipts
+        BigDecimal servicePrice = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal addOnsTotal = appointment.getAddOns().stream()
+                .map(AddOn::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal subtotal = servicePrice.add(addOnsTotal).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // totalAmount = subtotal - discount + tip
+        appointment.setTotalAmount(subtotal.subtract(discountAmount).add(tip).setScale(2, RoundingMode.HALF_UP));
 
         appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
         appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
+        appointment.setRemainingBalance(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         appointment.setUpdatedAt(LocalDateTime.now());
         appointment.setCompletedAt(LocalDateTime.now());
 
@@ -162,17 +195,6 @@ public class AdminAppointmentService {
             appointment.setPaymentStatus(dto.getPaymentStatus());
         }
 
-//        if (dto.getAppointmentTime() != null && appointment.getAppointmentStatus() != AppointmentStatus.COMPLETED) {
-//            int bufferMinutes = businessSettings.getBufferMinutes();
-//            LocalDateTime start = dto.getAppointmentTime();
-//            LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
-//
-//            if (appointmentRepository.findConflictingAppointments(start, end, bufferMinutes).stream().findAny().isPresent()) {
-//                throw new ConflictException("This time overlaps with another appointment.");
-//            }
-//
-//            appointment.setAppointmentTime(dto.getAppointmentTime());
-//        }
 
         if (dto.getAppointmentStatus() == AppointmentStatus.CANCELED) {
             if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()) {

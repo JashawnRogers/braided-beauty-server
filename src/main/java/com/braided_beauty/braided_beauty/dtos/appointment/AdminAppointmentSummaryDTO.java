@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import software.amazon.awssdk.services.s3.endpoints.internal.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,4 +33,6 @@ public class AdminAppointmentSummaryDTO {
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
     private final String note;
+    private final BigDecimal discountAmount;
+    private final Integer discountPercent;
 }
