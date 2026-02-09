@@ -95,6 +95,9 @@ public class Appointment {
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
+    @Column(name = "canceled_at")
+    private String canceledAt;
+
     @Column(name = "loyalty_applied", nullable = false)
     private boolean loyaltyApplied = false;
 
