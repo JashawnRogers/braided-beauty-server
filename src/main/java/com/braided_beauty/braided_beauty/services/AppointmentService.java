@@ -146,57 +146,10 @@ public class AppointmentService {
                 .multiply(new BigDecimal("0.20"))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal remainingBeforeDiscount = subtotal
-                .subtract(deposit)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        // --- Discount applies ONLY if ambassador ---
-        int pct = Math.max(
-                0,
-                Math.min(100, Objects.requireNonNullElse(settings.getAmbassadorDiscountPercent(), 0))
-        );
-
-        boolean isAmbassador =
-                appointment.getUser() != null
-                        && appointment.getUser().getUserType() == UserType.AMBASSADOR
-                        && pct > 0;
-
-        BigDecimal discountAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        if (isAmbassador && remainingBeforeDiscount.compareTo(BigDecimal.ZERO) > 0) {
-            // compute discount on FINAL portion only (remaining balance)
-            discountAmount = computeAmbassadorDiscount(remainingBeforeDiscount, pct)
-                    .setScale(2, RoundingMode.HALF_UP);
-            if (discountAmount.compareTo(remainingBeforeDiscount) > 0) {
-                discountAmount = remainingBeforeDiscount;
-            }
-        }
-
-        BigDecimal remainingAfterDiscount = remainingBeforeDiscount
-                .subtract(discountAmount)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        if (remainingAfterDiscount.compareTo(BigDecimal.ZERO) < 0) {
-            remainingAfterDiscount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-
         // Persist baseline fields
         appointment.setCreatedAt(LocalDateTime.now());
 
-        appointment.setDepositAmount(deposit);
         appointment.setTipAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-
-        appointment.setDiscountPercent(isAmbassador ? pct : 0);
-        appointment.setDiscountAmount(discountAmount);
-
-        // IMPORTANT:
-        // totalAmount = subtotal - discount (tip is added later at final payment / cash completion)
-        appointment.setTotalAmount(
-                subtotal.subtract(discountAmount).setScale(2, RoundingMode.HALF_UP)
-        );
-
-        // IMPORTANT:
-        // remainingBalance becomes the amount still owed AFTER discount and AFTER deposit.
-        appointment.setRemainingBalance(remainingAfterDiscount);
 
         // -------------------------------
         // save appointment row (+ create deposit session if needed)

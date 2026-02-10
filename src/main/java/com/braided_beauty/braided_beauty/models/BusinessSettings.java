@@ -33,7 +33,4 @@ public class BusinessSettings {
 
     @Column(name = "apt_buffer_time")
     private Integer appointmentBufferTime = 0;
-
-    @Column(name = "ambassador_discount_percent")
-    private Integer ambassadorDiscountPercent = 0;
 }

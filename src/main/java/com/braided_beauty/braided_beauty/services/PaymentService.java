@@ -146,6 +146,7 @@ public class PaymentService {
             String cancelUrl,
             BigDecimal tipAmount
     ) throws StripeException {
+        // This method should be responsible for creating the Stripe session + payment row.
 
         tipAmount = Objects.requireNonNullElse(tipAmount, BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -167,78 +168,20 @@ public class PaymentService {
             }
         }
 
-        // ✅ Source of truth: appointment.remainingBalance is already AFTER discount and AFTER deposit.
-        BigDecimal remainingDue = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
+        BigDecimal remaining = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        if (remainingDue.compareTo(BigDecimal.ZERO) <= 0) {
+        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("No remaining balance to pay");
         }
 
-        BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        int discountPercent = Math.max(0, Objects.requireNonNullElse(appointment.getDiscountPercent(), 0));
-
-        // For display only (what remaining would have been BEFORE discount)
-        BigDecimal remainingBeforeDiscount = remainingDue.add(discountAmount).setScale(2, RoundingMode.HALF_UP);
-
-        // Stripe charge = remaining due + tip
-        BigDecimal finalAmountCharged = remainingDue.add(tipAmount).setScale(2, RoundingMode.HALF_UP);
-        if (finalAmountCharged.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalStateException("No amount due for appointment " + appointment.getId());
-        }
-
-        // Update appointment totals (discount already included; just add tip + recompute totalAmount)
-        BigDecimal servicePrice = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal addOnsTotal = appointment.getAddOns().stream()
-                .map(AddOn::getPrice)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal subtotal = servicePrice.add(addOnsTotal).setScale(2, RoundingMode.HALF_UP);
-
-        appointment.setTipAmount(tipAmount);
-
-        // totalAmount = subtotal - discount + tip
-        appointment.setTotalAmount(
-                subtotal.subtract(discountAmount).add(tipAmount).setScale(2, RoundingMode.HALF_UP)
-        );
-
         String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
 
-        // --- Stripe line items (must be NON-NEGATIVE) ---
-        // We charge the discounted remaining due, and describe the discount.
-        String remainingLabel = "Remaining balance: " + appointment.getService().getName();
-
-        String remainingDescription = null;
-        if (discountAmount.compareTo(BigDecimal.ZERO) > 0 && discountPercent > 0) {
-            remainingLabel = "Remaining balance (after " + discountPercent + "% ambassador discount)";
-            remainingDescription =
-                    "Original remaining: $" + remainingBeforeDiscount
-                            + " | Discount: -$" + discountAmount
-                            + " | Due now: $" + remainingDue;
-        }
+        long remainingCents = remaining.movePointRight(2).longValueExact();
 
         List<SessionCreateParams.LineItem> lineItems = new ArrayList<>();
 
-        // Remaining due line item
-        SessionCreateParams.LineItem.PriceData.ProductData.Builder productBuilder =
-                SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                        .setName(remainingLabel);
-
-        if (remainingDescription != null) {
-            productBuilder.setDescription(remainingDescription);
-        }
-
-        long remainingCents = remainingDue.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
-        if (remainingCents < 0) {
-            throw new IllegalStateException("Remaining balance became negative; check discount math on booking.");
-        }
-
+        // Remaining balance line item
         lineItems.add(
                 SessionCreateParams.LineItem.builder()
                         .setQuantity(1L)
@@ -246,7 +189,11 @@ public class PaymentService {
                                 SessionCreateParams.LineItem.PriceData.builder()
                                         .setCurrency("usd")
                                         .setUnitAmount(remainingCents)
-                                        .setProductData(productBuilder.build())
+                                        .setProductData(
+                                                SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                        .setName("Remaining balance: " + appointment.getService().getName())
+                                                        .build()
+                                        )
                                         .build()
                         )
                         .build()
@@ -254,7 +201,7 @@ public class PaymentService {
 
         // Tip line item (optional)
         if (tipAmount.compareTo(BigDecimal.ZERO) > 0) {
-            long tipCents = tipAmount.setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact();
+            long tipCents = tipAmount.movePointRight(2).longValueExact();
             lineItems.add(
                     SessionCreateParams.LineItem.builder()
                             .setQuantity(1L)
@@ -273,6 +220,8 @@ public class PaymentService {
             );
         }
 
+        BigDecimal finalAmountCharged = remaining.add(tipAmount).setScale(2, RoundingMode.HALF_UP);
+
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl)
@@ -287,11 +236,7 @@ public class PaymentService {
                                 .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
                                 .putMetadata("paymentType", "final")
                                 .putMetadata("tipAmount", tipAmount.toString())
-                                // echo what the appointment already decided
-                                .putMetadata("discountPercent", String.valueOf(discountPercent))
-                                .putMetadata("discountAmount", discountAmount.toString())
-                                .putMetadata("remainingBalanceBeforeDiscount", remainingBeforeDiscount.toString())
-                                .putMetadata("remainingBalanceDue", remainingDue.toString())
+                                .putMetadata("remainingBalanceDue", remaining.toString())
                                 .putMetadata("finalAmountCharged", finalAmountCharged.toString())
                                 .build()
                 )
@@ -302,7 +247,7 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
                 .stripePaymentIntentId(session.getPaymentIntent())
-                .amount(finalAmountCharged) // actual Stripe charge for final session
+                .amount(finalAmountCharged) // Stripe charge = remaining + tip
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentMethod(PaymentMethod.CARD)
@@ -311,7 +256,6 @@ public class PaymentService {
                 .user(appointment.getUser())
                 .build();
 
-        appointmentRepository.save(appointment);
         paymentRepository.save(payment);
 
         log.info("Created Stripe checkout session for final payment. Session ID: {}", session.getId());

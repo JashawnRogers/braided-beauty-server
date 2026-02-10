@@ -1,0 +1,2 @@
+ALTER TABLE business_settings
+DROP COLUMN IF EXISTS ambassador_discount_percent;
