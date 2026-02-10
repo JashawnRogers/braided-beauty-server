@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -64,7 +65,7 @@ public class PromoCode {
         updatedAt = now;
 
         if (code != null) {
-            code = code.trim().toUpperCase();
+            code = code.trim().toUpperCase(Locale.ROOT);
         }
     }
 
@@ -73,7 +74,7 @@ public class PromoCode {
         updatedAt = LocalDateTime.now();
 
         if (code != null) {
-            code = code.trim().toUpperCase();
+            code = code.trim().toUpperCase(Locale.ROOT);
         }
     }
 }

@@ -53,6 +53,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(BadRequestException ex){
+        return response(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     // --- Validation / request errors ------------------------------------------
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
