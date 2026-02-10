@@ -76,6 +76,18 @@ public class Appointment {
     @Column(name = "total_amount")
     private BigDecimal totalAmount; // = amount of base service + any add-ons + tip
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promo_code_id")
+    private PromoCode promoCode;
+
+
+    /**
+     * Snapshot of the code the customer typed at booking time.
+     * This helps keep history even if the promo code record is later edited/disabled.
+     */
+    @Column(name = "promo_code_text")
+    private String promoCodeText;
+
     @Column(name = "discount_amount")
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
@@ -96,7 +108,7 @@ public class Appointment {
     private String cancelReason;
 
     @Column(name = "canceled_at")
-    private String canceledAt;
+    private LocalDateTime canceledAt;
 
     @Column(name = "loyalty_applied", nullable = false)
     private boolean loyaltyApplied = false;
