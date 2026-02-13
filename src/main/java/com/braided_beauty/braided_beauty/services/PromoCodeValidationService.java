@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 @AllArgsConstructor
@@ -17,11 +18,11 @@ public class PromoCodeValidationService {
     private final PromoCodeRepository promoCodeRepository;
     private final Clock clock;
 
-    public PromoCode validateAndGet(String rawPromoCode) {
+    public PromoCode validateAndGetOrNull(String rawPromoCode) {
         String code = normalize(rawPromoCode);
 
         if (code == null) {
-            throw new BadRequestException("Promo code is required");
+            return null;
         }
 
         PromoCode promo = promoCodeRepository.findByCodeIgnoreCase(code)
@@ -43,7 +44,8 @@ public class PromoCodeValidationService {
 
         // May be null and null = unlimited
         Integer max = promo.getMaxRedemptions();
-        int redeemed = promo.getTimesRedeemed();
+
+        int redeemed = Objects.requireNonNullElse(promo.getTimesRedeemed(), 0);
 
         if (max != null && redeemed >= max) {
             throw new BadRequestException("Promo code has reached its' redemption limit.");

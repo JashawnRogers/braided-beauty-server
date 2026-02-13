@@ -26,4 +26,5 @@ public class AppointmentRequestDTO {
     private final String stripePaymentId;
     private final String cancelReason;
     private final List<UUID> addOnIds;
+    private final String promoText;
 }

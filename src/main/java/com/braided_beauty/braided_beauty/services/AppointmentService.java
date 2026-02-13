@@ -4,6 +4,7 @@ import com.braided_beauty.braided_beauty.dtos.appointment.*;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.UserType;
+import com.braided_beauty.braided_beauty.exceptions.BadRequestException;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
@@ -12,6 +13,7 @@ import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
+import com.braided_beauty.braided_beauty.records.PricingBreakdown;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
@@ -30,7 +32,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -60,6 +61,8 @@ public class AppointmentService {
     private final BusinessSettingsService businessSettingsService;
     private final EmailService emailService;
     private final EmailTemplateService emailTemplateService;
+    private final PricingService pricingService;
+    private final PromoCodeValidationService promoCodeValidationService;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
 
@@ -72,96 +75,39 @@ public class AppointmentService {
         ServiceModel service = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
 
-        appointmentRepository.lockSchedule();
-
-        BusinessSettings settings = businessSettingsService.getOrCreate();
-
-        int bufferMinutes = businessSettingsService.getAppointmentBufferMinutes();
-        LocalDateTime start = dto.getAppointmentTime();
-
         Appointment appointment = appointmentDtoMapper.toEntity(dto);
 
-        // ----- user vs guest -----
-        if (principal != null) {
-            User user = userRepository.findById(principal.id())
-                    .orElseThrow(() -> new NotFoundException("No user found with ID: " + principal.id()));
-            appointment.setUser(user);
-            appointment.setGuestEmail(null);
-        } else {
-            String email = dto.getReceiptEmail();
-            if (email == null || email.isBlank()) {
-                throw new IllegalArgumentException("Guest booking requires a receipt email");
-            }
-            appointment.setUser(null);
-            appointment.setGuestEmail(email);
-            appointment.setGuestCancelToken(UUID.randomUUID().toString());
-            appointment.setGuestTokenExpiresAt(appointment.getAppointmentTime()); // keeping your current behavior
+        // user vs guest
+        attachUserOrGuest(appointment, dto, principal);
+
+        // service + add-ons
+        attachServiceAndAddOns(appointment, service, dto);
+
+        appointmentRepository.lockSchedule();
+
+        // conflict check
+        assertNoConflicts(appointment, businessSettingsService.getAppointmentBufferMinutes());
+
+        // promo code
+        PromoCode promoCode = promoCodeValidationService.validateAndGetOrNull(dto.getPromoText());
+        if (promoCode != null) {
+            appointment.setPromoCode(promoCode);
+            appointment.setPromoCodeText(promoCode.getCode());
         }
 
-        boolean hasUser = appointment.getUser() != null;
-        boolean hasGuestEmail = appointment.getGuestEmail() != null && !appointment.getGuestEmail().isBlank();
-        if (hasUser == hasGuestEmail) {
-            throw new IllegalStateException("Must have exactly one: user or guest email");
-        }
+        // pricing baseline
+        PricingBreakdown pricingBreakdown = pricingService.calculate(appointment);
+        appointment.setDepositAmount(pricingBreakdown.deposit());
+        appointment.setRemainingBalance(pricingBreakdown.remainingBalance());
+        appointment.setDiscountAmount(pricingBreakdown.discountAmount());
+        appointment.setTotalAmount(pricingBreakdown.subtotal());
 
-        // ----- service + add-ons -----
-        appointment.setService(service);
-
-        List<AddOn> addOns = new ArrayList<>();
-        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
-            addOns = addOnService.getAddOnIds(dto.getAddOnIds());
-        }
-        appointment.setAddOns(addOns);
-
-        int addOnMinutes = addOns.stream()
-                .map(AddOn::getDurationMinutes)
-                .filter(Objects::nonNull)
-                .mapToInt(Integer::intValue)
-                .sum();
-
-        BigDecimal addOnsTotal = addOns.stream()
-                .map(AddOn::getPrice)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        int durationMinutes = (service.getDurationMinutes() == null ? 0 : service.getDurationMinutes()) + addOnMinutes;
-        appointment.setDurationMinutes(durationMinutes);
-
-        // ----- conflict check -----
-        LocalDateTime end = start.plusMinutes(durationMinutes + bufferMinutes);
-        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
-        if (!conflicts.isEmpty()) {
-            throw new ConflictException("This time overlaps with another appointment.");
-        }
-
-        // ----- PRICING BASELINE (single source of truth) -----
-        BigDecimal servicePrice = Objects.requireNonNullElse(service.getPrice(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal subtotal = servicePrice
-                .add(Objects.requireNonNullElse(addOnsTotal, BigDecimal.ZERO))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal deposit = subtotal
-                .multiply(new BigDecimal("0.20"))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        // Persist baseline fields
-        appointment.setCreatedAt(LocalDateTime.now());
-
-        appointment.setTipAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-
-        // -------------------------------
         // save appointment row (+ create deposit session if needed)
-        // -------------------------------
         try {
-            if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
+            if (pricingBreakdown.deposit().compareTo(BigDecimal.ZERO) <= 0) {
                 appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
                 appointment.setPaymentStatus(PaymentStatus.NO_DEPOSIT_REQUIRED);
                 appointment.setHoldExpiresAt(null);
-
-                // If there is no deposit, the "remaining balance" should be 0 (nothing owed now).
-                appointment.setRemainingBalance(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
 
                 Appointment savedNoDepositRequired = appointmentRepository.saveAndFlush(appointment);
 
@@ -292,6 +238,52 @@ public class AppointmentService {
         return appointmentRepository
                 .findByUser_IdAndAppointmentStatusInOrderByAppointmentTimeDesc(userId, statuses, pageable)
                 .map(appointmentDtoMapper::toSummaryDTO);
+    }
+
+    private void assertNoConflicts(Appointment appointment, int bufferMinutes) {
+        LocalDateTime start = appointment.getAppointmentTime();
+        LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
+        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
+        if (!conflicts.isEmpty()) {
+            throw new ConflictException("This time overlaps with another appointment.");
+        }
+    }
+
+    private void attachServiceAndAddOns(Appointment appointment, ServiceModel service, AppointmentRequestDTO dto) {
+        appointment.setService(service);
+
+        List<AddOn> addOns = new ArrayList<>();
+        if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
+            addOns = addOnService.getAddOnIds(dto.getAddOnIds());
+        }
+        appointment.setAddOns(addOns);
+
+        int addOnMinutes = addOns.stream()
+                .map(AddOn::getDurationMinutes)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        int durationMinutes = (service.getDurationMinutes() == null ? 0 : service.getDurationMinutes()) + addOnMinutes;
+        appointment.setDurationMinutes(durationMinutes);
+    }
+
+    private void attachUserOrGuest(Appointment appointment, AppointmentRequestDTO dto, AppUserPrincipal principal) {
+        if (principal != null) {
+            User user = userRepository.findById(principal.id())
+                    .orElseThrow(() -> new NotFoundException("No user found with ID: " + principal.id()));
+            appointment.setUser(user);
+            appointment.setGuestEmail(null);
+        } else {
+            String email = dto.getReceiptEmail();
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Guest booking requires a receipt email");
+            }
+            appointment.setUser(null);
+            appointment.setGuestEmail(email);
+            appointment.setGuestCancelToken(UUID.randomUUID().toString());
+            appointment.setGuestTokenExpiresAt(appointment.getAppointmentTime()); // keeping your current behavior
+        }
     }
 
     private boolean isAppointmentTimeUniqueViolation(DataIntegrityViolationException ex) {
@@ -513,12 +505,5 @@ public class AppointmentService {
         };
 
         runAfterCommit(work);
-    }
-
-    private BigDecimal computeAmbassadorDiscount(BigDecimal remainingBalance, int percent) {
-        if (percent <= 0) return BigDecimal.ZERO;
-        return remainingBalance
-                .multiply(BigDecimal.valueOf(percent))
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 }

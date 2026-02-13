@@ -8,8 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface PromoCodeRepository extends JpaRepository<UUID, PromoCode> {
+public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
     Optional<PromoCode> findByCodeIgnoreCase(String discountCode);
-
-    boolean existsByCodeIgnoreCase(String discountCode);
 }
