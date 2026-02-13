@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @AllArgsConstructor
@@ -66,28 +67,47 @@ public class PaymentService {
         log.info("Refund successful for appointment ID: {}", appointment.getId());
     }
 
-    // Session are created to be sent to webhook
+    // Session is created to be sent to webhook
     @Transactional
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
-        // Idempotency guard: if a deposit payment already exists for this appointment, reuse the existing session.
-        paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT)
-                .ifPresent(existing -> {
-                    if (existing.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
-                            || existing.getPaymentStatus() == PaymentStatus.REFUNDED
-                            || existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL) {
-                        throw new IllegalStateException("Deposit already processed for appointment " + appointment.getId());
-                    }
-                });
+        Objects.requireNonNull(appointment, "appointment is required");
+        Objects.requireNonNull(appointment.getId(), "appointment ID is required (persist before calling Stripe)");
 
+        // Idempotency guard: if a deposit payment already exists for this appointment, reuse the existing session
         Optional<Payment> existingDepositOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT);
-        if (existingDepositOpt.isPresent() && existingDepositOpt.get().getStripeSessionId() != null
-                && existingDepositOpt.get().getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
-            log.info("Reusing existing deposit checkout session {} for appointment {}", existingDepositOpt.get().getStripeSessionId(), appointment.getId());
-            return Session.retrieve(existingDepositOpt.get().getStripeSessionId());
+        if (existingDepositOpt.isPresent()) {
+            Payment existing = existingDepositOpt.get();
+
+            if (existing.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
+                    || existing.getPaymentStatus() == PaymentStatus.REFUNDED
+                    || existing.getPaymentStatus() == PaymentStatus.PAID_IN_FULL) {
+                throw new IllegalStateException("Deposit already processed for appointment " + appointment.getId());
+            }
+
+            if (existing.getStripeSessionId() != null && existing.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
+                log.info("Reusing existing deposit checkout session {} for appointment {}", existing.getStripeSessionId(), appointment.getId());
+                return Session.retrieve(existing.getStripeSessionId());
+            }
         }
 
-        BigDecimal deposit = appointment.getDepositAmount();
+        BigDecimal deposit = Objects.requireNonNullElse(appointment.getDepositAmount(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+        if (deposit.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("No deposit required for appointment " + appointment.getId());
+        }
+
         String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Missing customer email for appointment " + appointment.getId());
+        }
+
+        long depositCents = deposit.movePointRight(2).longValueExact();
+
+        String addOnNames = appointment.getAddOns() == null ? "" :
+                appointment.getAddOns().stream()
+                        .map(AddOn::getName)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.joining(","));
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
@@ -102,10 +122,10 @@ public class PaymentService {
                                 .setPriceData(
                                         SessionCreateParams.LineItem.PriceData.builder()
                                                 .setCurrency("usd")
-                                                .setUnitAmount(deposit.movePointRight(2).longValue())
+                                                .setUnitAmount(depositCents)
                                                 .setProductData(
                                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                                .setName(appointment.getService().getName())
+                                                                .setName("Deposit - " + appointment.getService().getName())
                                                                 .build())
                                                 .build())
                                 .build()
@@ -114,7 +134,7 @@ public class PaymentService {
                         SessionCreateParams.PaymentIntentData.builder()
                                 .putMetadata("appointmentId", appointment.getId().toString())
                                 .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
-                                .putMetadata("addOnIds", appointment.getAddOns().toString())
+                                .putMetadata("addOnNames", addOnNames)
                                 .putMetadata("paymentType", "deposit")
                                 .build()
                 )
