@@ -98,8 +98,8 @@ public class AppointmentService {
         // pricing baseline
         PricingBreakdown pricingBreakdown = pricingService.calculate(appointment);
         appointment.setDepositAmount(pricingBreakdown.deposit());
-        appointment.setRemainingBalance(pricingBreakdown.remainingBalance());
-        appointment.setDiscountAmount(pricingBreakdown.discountAmount());
+        appointment.setRemainingBalance(pricingBreakdown.postDepositBalance());
+        appointment.setDiscountAmount(pricingBreakdown.promoDiscount());
         appointment.setTotalAmount(pricingBreakdown.subtotal());
 
         // save appointment row (+ create deposit session if needed)

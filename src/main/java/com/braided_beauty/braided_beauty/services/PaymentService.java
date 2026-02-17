@@ -1,10 +1,13 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.enums.*;
+import com.braided_beauty.braided_beauty.exceptions.BadRequestException;
+import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
+import com.braided_beauty.braided_beauty.records.PricingBreakdown;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
@@ -28,7 +31,6 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @AllArgsConstructor
 @Service
@@ -42,6 +44,7 @@ public class PaymentService {
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
     private final BusinessSettingsService businessSettingsService;
+    private final PricingService pricingService;
     private final FrontendProps frontendProps;
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
@@ -72,6 +75,14 @@ public class PaymentService {
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
         Objects.requireNonNull(appointment, "appointment is required");
         Objects.requireNonNull(appointment.getId(), "appointment ID is required (persist before calling Stripe)");
+
+        if (successUrl == null || successUrl.isBlank()) {
+            throw new IllegalStateException("Missing successUrl");
+        }
+
+        if (cancelUrl == null || cancelUrl.isBlank()) {
+            throw new IllegalStateException("Missing cancelUrl");
+        }
 
         // Idempotency guard: if a deposit payment already exists for this appointment, reuse the existing session
         Optional<Payment> existingDepositOpt = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT);
@@ -113,7 +124,7 @@ public class PaymentService {
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
-                .setCustomerEmail(email)
+                .setCustomerEmail(email.trim())
                 .putMetadata("appointmentId", appointment.getId().toString())
                 .putMetadata("paymentType", "deposit")
                 .addLineItem(
@@ -167,9 +178,36 @@ public class PaymentService {
             BigDecimal tipAmount
     ) throws StripeException {
         // This method should be responsible for creating the Stripe session + payment row.
+        Objects.requireNonNull(appointment, "appointment is required");
+        Objects.requireNonNull(appointment.getId(), "appointment ID is required");
+        Objects.requireNonNull(appointment.getService(), "appointment service is required");
+
+        if (successUrl == null || successUrl.isBlank()) {
+            throw new IllegalStateException("Missing successUrl");
+        }
+
+        if (cancelUrl == null || cancelUrl.isBlank()) {
+            throw new IllegalStateException("Missing cancelUrl");
+        }
 
         tipAmount = Objects.requireNonNullElse(tipAmount, BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
+        if (tipAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Tip amount cannot be negative");
+        }
+
+        PricingBreakdown pricingBreakdown = pricingService.calculate(appointment);
+        BigDecimal amountDueBeforeTip = pricingBreakdown.amountDueBeforeTip().setScale(2, RoundingMode.HALF_UP);
+        if (amountDueBeforeTip.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("No remaining balance to pay");
+        }
+
+        BigDecimal amountDuePlusTip = amountDueBeforeTip
+                .add(tipAmount)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (amountDuePlusTip.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Final payment amount must be greater than 0");
+        }
 
         // --- idempotency guard ---
         Optional<Payment> existingFinalOpt =
@@ -181,25 +219,55 @@ public class PaymentService {
                     || existing.getPaymentStatus() == PaymentStatus.REFUNDED) {
                 throw new IllegalStateException("Final payment already processed for appointment " + appointment.getId());
             }
+
             if (existing.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT && existing.getStripeSessionId() != null) {
+
+                // Compare against what we previously created the session for
+                BigDecimal existingAmount = Objects.requireNonNullElse(existing.getAmount(), BigDecimal.ZERO)
+                        .setScale(2, RoundingMode.HALF_UP);
+
+                if (existingAmount.compareTo(amountDuePlusTip) != 0) {
+                    throw new ConflictException(
+                            "A final payment session already exists. Please complete or cancel it before changing the total."
+                    );
+                }
+
                 log.info("Reusing existing final-payment checkout session {} for appointment {}",
                         existing.getStripeSessionId(), appointment.getId());
                 return Session.retrieve(existing.getStripeSessionId());
             }
         }
 
-        BigDecimal remaining = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalStateException("No remaining balance to pay");
+        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
+        if (email == null || email.isBlank()) {
+            throw new IllegalStateException("Missing customer email for appointment: " + appointment.getId());
         }
 
-        String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
-
-        long remainingCents = remaining.movePointRight(2).longValueExact();
+        long remainingCents = amountDueBeforeTip.movePointRight(2).longValueExact();
 
         List<SessionCreateParams.LineItem> lineItems = new ArrayList<>();
+
+        String remainingBalanceLabel = "Remaining balance: " + appointment.getService().getName();
+        String remainingBalanceDescription = null;
+
+        String promoText = appointment.getPromoCodeText();
+        BigDecimal promoDiscount = pricingBreakdown.promoDiscount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal postDepositBalance = pricingBreakdown.postDepositBalance().setScale(2, RoundingMode.HALF_UP);
+        if (promoText != null && !promoText.isBlank() && promoDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            remainingBalanceLabel = "Remaining balance (after promo): " + appointment.getService().getName();
+            remainingBalanceDescription =
+                    "Promo: " + promoText.trim().toUpperCase(Locale.ROOT)
+                            + " | Discount: $" + promoDiscount
+                            + " | Original remaining balance: $" + postDepositBalance
+                            + " | Amount due (after promo): $" + amountDueBeforeTip;
+        }
+
+        SessionCreateParams.LineItem.PriceData.ProductData.Builder productBuilder =
+                SessionCreateParams.LineItem.PriceData.ProductData.builder().setName(remainingBalanceLabel);
+
+        if (remainingBalanceDescription != null) {
+            productBuilder.setDescription(remainingBalanceDescription);
+        }
 
         // Remaining balance line item
         lineItems.add(
@@ -209,17 +277,12 @@ public class PaymentService {
                                 SessionCreateParams.LineItem.PriceData.builder()
                                         .setCurrency("usd")
                                         .setUnitAmount(remainingCents)
-                                        .setProductData(
-                                                SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                        .setName("Remaining balance: " + appointment.getService().getName())
-                                                        .build()
-                                        )
+                                        .setProductData(productBuilder.build())
                                         .build()
                         )
                         .build()
         );
 
-        // Tip line item (optional)
         if (tipAmount.compareTo(BigDecimal.ZERO) > 0) {
             long tipCents = tipAmount.movePointRight(2).longValueExact();
             lineItems.add(
@@ -240,26 +303,29 @@ public class PaymentService {
             );
         }
 
-        BigDecimal finalAmountCharged = remaining.add(tipAmount).setScale(2, RoundingMode.HALF_UP);
+        SessionCreateParams.PaymentIntentData.Builder paymentIntent =
+                SessionCreateParams.PaymentIntentData.builder()
+                        .putMetadata("appointmentId", appointment.getId().toString())
+                        .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
+                        .putMetadata("paymentType", "final")
+                        .putMetadata("amountDueBeforeTip", amountDueBeforeTip.toString())
+                        .putMetadata("promoDiscount", promoDiscount.toString())
+                        .putMetadata("tipAmount", tipAmount.toString())
+                        .putMetadata("finalAmountCharged", amountDuePlusTip.toString());
+
+        if (promoText != null && !promoText.isBlank()) {
+            paymentIntent.putMetadata("promoCode", promoText.trim().toUpperCase(Locale.ROOT));
+        }
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
-                .setCustomerEmail(email)
+                .setCustomerEmail(email.trim())
                 .putMetadata("appointmentId", appointment.getId().toString())
                 .putMetadata("paymentType", "final")
                 .addAllLineItem(lineItems)
-                .setPaymentIntentData(
-                        SessionCreateParams.PaymentIntentData.builder()
-                                .putMetadata("appointmentId", appointment.getId().toString())
-                                .putMetadata("userId", appointment.getUser() != null ? appointment.getUser().getId().toString() : "guest")
-                                .putMetadata("paymentType", "final")
-                                .putMetadata("tipAmount", tipAmount.toString())
-                                .putMetadata("remainingBalanceDue", remaining.toString())
-                                .putMetadata("finalAmountCharged", finalAmountCharged.toString())
-                                .build()
-                )
+                .setPaymentIntentData(paymentIntent.build())
                 .build();
 
         Session session = Session.create(params);
@@ -267,7 +333,7 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
                 .stripePaymentIntentId(session.getPaymentIntent())
-                .amount(finalAmountCharged) // Stripe charge = remaining + tip
+                .amount(amountDuePlusTip) // Stripe charge = remaining + tip
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentMethod(PaymentMethod.CARD)
@@ -399,7 +465,7 @@ public class PaymentService {
                         .filter(Objects::nonNull)
                         .toList());
                 adminModel.put("customerName", customerName);
-                adminModel.put("customerEmail", email);
+                adminModel.put("customerEmail", email.trim());
                 adminModel.put("depositAmount", saved.getDepositAmount() != null ? saved.getDepositAmount() : BigDecimal.ZERO);
                 adminModel.put("customerNote", saved.getNote() != null ? saved.getNote() : "");
                 adminModel.put("adminAppointmentUrl", frontendProps.baseUrl() + "dashboard/admin/appointments/" + appointment.getId());

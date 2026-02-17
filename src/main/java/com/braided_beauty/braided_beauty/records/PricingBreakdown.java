@@ -3,12 +3,12 @@ package com.braided_beauty.braided_beauty.records;
 import java.math.BigDecimal;
 
 public record PricingBreakdown(
-        BigDecimal subtotal,
-        BigDecimal deposit,
-        BigDecimal remainingBalance,   // baseline: subtotal - deposit
-        BigDecimal discountAmount,     // computed from promo against remainingBalance
-        BigDecimal remainingDue,       // remainingBalance - discountAmount (>= 0)
+        BigDecimal subtotal,            // service + add-ons
+        BigDecimal deposit,             // deposit required now (not discounted)
+        BigDecimal postDepositBalance,  // subtotal - deposit
+        BigDecimal promoDiscount,       // discount applied to postDepositBalance
+        BigDecimal amountDueBeforeTip,  // postDepositBalance - promoDiscount (>= 0)
         BigDecimal tip,
-        BigDecimal finalDue            // remainingDue + tip (>= 0)
+        BigDecimal amountDue            // amountDueBeforeTip + tip (>= 0)
 ) {
 }
