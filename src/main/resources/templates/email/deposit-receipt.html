@@ -35,8 +35,30 @@
       </td>
     </tr>
 
+    <!-- Show original remaining only if promo applied -->
+    <tr th:if="${promoDiscount != null and promoDiscount.signum() != 0}">
+      <td style="padding:6px 0; font-size:14px;">Original remaining balance</td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        <span th:text="${'$' + #numbers.formatDecimal(originalRemaining, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
+      </td>
+    </tr>
+
+    <!-- Promo discount -->
+    <tr th:if="${promoDiscount != null and promoDiscount.signum() != 0}">
+      <td style="padding:6px 0; font-size:14px;">
+        Discount <span th:if="${promoLabel != null}" th:text="'(' + promoLabel + ')'"></span>
+      </td>
+      <td align="right" style="padding:6px 0; font-size:14px;">
+        -<span th:text="${'$' + #numbers.formatDecimal(promoDiscount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
+      </td>
+    </tr>
+
+    <!-- Remaining balance label changes depending on promo -->
     <tr>
-      <td style="padding:6px 0; font-size:14px;">Remaining balance</td>
+      <td style="padding:6px 0; font-size:14px;"
+          th:text="${(promoDiscount != null and promoDiscount.signum() != 0) ? 'Remaining balance after promo' : 'Remaining balance after deposit'}">
+        Remaining balance
+      </td>
       <td align="right" style="padding:6px 0; font-size:14px;">
         <strong th:text="${'$' + #numbers.formatDecimal(remainingAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</strong>
       </td>

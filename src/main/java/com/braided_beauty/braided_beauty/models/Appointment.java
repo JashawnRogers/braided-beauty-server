@@ -76,6 +76,18 @@ public class Appointment {
     @Column(name = "total_amount")
     private BigDecimal totalAmount; // = amount of base service + any add-ons + tip
 
+    @Column(name = "service_price_at_booking")
+    private BigDecimal servicePriceAtBooking;
+
+    @Column(name = "add_ons_total_at_booking")
+    private BigDecimal addOnsTotalAtBooking;
+
+    @Column(name = "subtotal_at_booking")
+    private BigDecimal subtotalAtBooking;
+
+    @Column(name = "post_deposit_balance_at_booking")
+    private BigDecimal postDepositBalanceAtBooking;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "promo_code_id")
     private PromoCode promoCode;

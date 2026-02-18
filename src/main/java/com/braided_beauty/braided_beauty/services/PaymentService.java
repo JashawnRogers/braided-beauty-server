@@ -5,6 +5,7 @@ import com.braided_beauty.braided_beauty.exceptions.BadRequestException;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
+import com.braided_beauty.braided_beauty.records.DiscountType;
 import com.braided_beauty.braided_beauty.records.EmailAddOnLine;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.records.PricingBreakdown;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import software.amazon.awssdk.services.s3.model.TargetObjectKeyFormat;
 
 import java.lang.String;
 import java.math.BigDecimal;
@@ -196,8 +198,8 @@ public class PaymentService {
             throw new BadRequestException("Tip amount cannot be negative");
         }
 
-        PricingBreakdown pricingBreakdown = pricingService.calculate(appointment);
-        BigDecimal amountDueBeforeTip = pricingBreakdown.amountDueBeforeTip().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal amountDueBeforeTip = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
         if (amountDueBeforeTip.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("No remaining balance to pay");
         }
@@ -251,8 +253,10 @@ public class PaymentService {
         String remainingBalanceDescription = null;
 
         String promoText = appointment.getPromoCodeText();
-        BigDecimal promoDiscount = pricingBreakdown.promoDiscount().setScale(2, RoundingMode.HALF_UP);
-        BigDecimal postDepositBalance = pricingBreakdown.postDepositBalance().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal promoDiscount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal postDepositBalance = Objects.requireNonNullElse(appointment.getPostDepositBalanceAtBooking(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
         if (promoText != null && !promoText.isBlank() && promoDiscount.compareTo(BigDecimal.ZERO) > 0) {
             remainingBalanceLabel = "Remaining balance (after promo): " + appointment.getService().getName();
             remainingBalanceDescription =
@@ -361,23 +365,7 @@ public class PaymentService {
         Appointment appointment = appointmentRepository.findById(UUID.fromString(appointmentId))
                 .orElseThrow(() -> new NotFoundException("Appointment not found: " + appointmentId));
 
-        List<AddOn> addOns = appointment.getAddOns();
-        ServiceModel service = appointment.getService();
-
-        BigDecimal addOnsTotal = addOns.stream()
-                .map(AddOn::getPrice)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal total = addOnsTotal
-                .add(service.getPrice())
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal deposit = total
-                .multiply(new BigDecimal("0.20"))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal remainingBalance = total.subtract(deposit).setScale(2, RoundingMode.HALF_UP);
+        ServiceModel service = Objects.requireNonNull(appointment.getService(), "Appointment service is required");
 
         String email = appointment.getUser() != null ? appointment.getUser().getEmail() : appointment.getGuestEmail();
 
@@ -410,18 +398,53 @@ public class PaymentService {
         }
 
         List<EmailAddOnLine> addOnLines = appointment.getAddOns().stream()
-                .map(a -> new EmailAddOnLine(a.getName(), a.getPrice().toString()))
+                .map(a -> new EmailAddOnLine(a.getName(), a.getPrice()))
                 .toList();
 
         String customerName = (appointment.getUser() != null ? appointment.getUser().getName() : "Guest");
+
+        String promoLabel = null;
+        PromoCode promo = appointment.getPromoCode();
+
+        if (promo != null) {
+            if (promo.getDiscountType() == DiscountType.PERCENT) {
+                promoLabel = promo.getValue().stripTrailingZeros().toPlainString() + "% off";
+            } else {
+                promoLabel = "$" + promo.getValue().setScale(2, RoundingMode.HALF_UP).toPlainString() + " off";
+            }
+        }
+
+        BigDecimal deposit = Objects.requireNonNullElse(appointment.getDepositAmount(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal originalRemainingAfterDeposit = Objects.requireNonNullElse(
+                appointment.getPostDepositBalanceAtBooking(), BigDecimal.ZERO
+        ).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal promoDiscountAtBooking = Objects.requireNonNullElse(
+                appointment.getDiscountAmount(), BigDecimal.ZERO
+        ).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal remainingAfterPromo = originalRemainingAfterDeposit
+                .subtract(promoDiscountAtBooking)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (remainingAfterPromo.compareTo(BigDecimal.ZERO) < 0) {
+            remainingAfterPromo = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal subtotal = Objects.requireNonNullElse(appointment.getSubtotalAtBooking(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
 
         Map<String, Object> base = new HashMap<>();
         base.put("customerName", customerName);
         base.put("appointmentDateTime", appointment.getAppointmentTime());
         base.put("serviceName", appointment.getService().getName());
-        base.put("depositAmount", appointment.getDepositAmount());
+        base.put("depositAmount", deposit);
         base.put("businessPhone", companyPhoneNumber);
         base.put("businessAddress",settings.getCompanyAddress());
+        base.put("promoDiscount", promoDiscountAtBooking);
+        base.put("promoLabel", promoLabel);
 
         // Persist state changes first. Email failures must not rollback payment/appointment updates.
         Runnable afterCommitEmailWork = null;
@@ -440,14 +463,16 @@ public class PaymentService {
                 appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
                 appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
                 appointment.setHoldExpiresAt(null);
-                appointment.setRemainingBalance(remainingBalance);
+                appointment.setRemainingBalance(remainingAfterPromo);
+                appointment.setDiscountAmount(promoDiscountAtBooking);
                 appointment.setLoyaltyApplied(false);
                 Appointment saved = appointmentRepository.save(appointment);
                 service.setTimesBooked(service.getTimesBooked() + 1);
                 serviceRepository.save(service);
 
                 Map<String, Object> depositModel = new HashMap<>(base);
-                depositModel.put("remainingAmount", remainingBalance);
+                depositModel.put("originalRemaining", originalRemainingAfterDeposit);
+                depositModel.put("remainingAmount", remainingAfterPromo);
                 depositModel.put("isGuest", clientType.equals("Guest"));
                 depositModel.put("noDepositRequired", false);
                 if (clientType.equals("Guest")) {
@@ -459,15 +484,15 @@ public class PaymentService {
                 Map<String, Object> adminModel = new HashMap<>();
                 adminModel.put("appointmentDateTime", saved.getAppointmentTime());
                 adminModel.put("clientType", clientType);
-                adminModel.put("serviceName", saved.getService().getName());
+                adminModel.put("serviceName", saved.getService().getName().trim());
                 adminModel.put("addOns", saved.getAddOns().stream()
                         .map(AddOn::getName)
                         .filter(Objects::nonNull)
                         .toList());
-                adminModel.put("customerName", customerName);
+                adminModel.put("customerName", customerName.trim());
                 adminModel.put("customerEmail", email.trim());
-                adminModel.put("depositAmount", saved.getDepositAmount() != null ? saved.getDepositAmount() : BigDecimal.ZERO);
-                adminModel.put("customerNote", saved.getNote() != null ? saved.getNote() : "");
+                adminModel.put("depositAmount", deposit);
+                adminModel.put("customerNote", saved.getNote() != null ? saved.getNote().trim() : "");
                 adminModel.put("adminAppointmentUrl", frontendProps.baseUrl() + "dashboard/admin/appointments/" + appointment.getId());
 
                 String adminEmail = businessSettingsService.getOrCreate().getCompanyEmail();
@@ -496,35 +521,26 @@ public class PaymentService {
                 log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
             }
             case FINAL -> {
-                // capture BEFORE you mutate appointment
-                BigDecimal remainingBeforeDiscount =
-                        Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO);
+                BigDecimal serviceAmount = Objects.requireNonNullElse(appointment.getServicePriceAtBooking(), BigDecimal.ZERO);
+                BigDecimal tip = Objects.requireNonNullElse(payment.getTipAmount(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
-                BigDecimal serviceAmount = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO);
-                BigDecimal subtotal = addOnsTotal.add(serviceAmount);
-
-                BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO);
-                BigDecimal depositAmount = Objects.requireNonNullElse(appointment.getDepositAmount(), BigDecimal.ZERO);
-                BigDecimal tip = Objects.requireNonNullElse(appointment.getTipAmount(), BigDecimal.ZERO);
-                int discountPercent = Objects.requireNonNullElse(appointment.getDiscountPercent(), 0);
-
-                BigDecimal chargedToday = remainingBeforeDiscount.subtract(discountAmount).add(tip);
+                BigDecimal chargedToday = Objects.requireNonNullElse(payment.getAmount(), BigDecimal.ZERO)
+                        .setScale(2, RoundingMode.HALF_UP);
                 if (chargedToday.compareTo(BigDecimal.ZERO) < 0) chargedToday = BigDecimal.ZERO;
 
-                BigDecimal totalPaid = depositAmount.add(chargedToday);
+                BigDecimal totalPaid = deposit.add(chargedToday);
 
-                // NOW update Payment row
                 payment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
                 payment.setStripePaymentIntentId(session.getPaymentIntent());
                 payment.setStripeSessionId(session.getId());
                 payment.setPaymentMethod(PaymentMethod.CARD);
                 paymentRepository.save(payment);
 
-                // NOW update Appointment
                 appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
                 appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
                 appointment.setRemainingBalance(BigDecimal.ZERO);
                 appointment.setCompletedAt(LocalDateTime.now());
+                appointment.setTipAmount(payment.getTipAmount());
 
                 if (appointment.getUser() == null) {
                     log.info("Skipping loyalty reward (guest appointment {})", appointmentId);
@@ -542,13 +558,10 @@ public class PaymentService {
                 finalModel.put("serviceAmount", serviceAmount);
                 finalModel.put("addOns", addOnLines);
                 finalModel.put("subtotal", subtotal);
-                finalModel.put("discountAmount", discountAmount);
-                finalModel.put("discountPercent", discountPercent);
-                finalModel.put("depositAmount", depositAmount);
+                finalModel.put("depositAmount", deposit);
                 finalModel.put("tipAmount", tip);
                 finalModel.put("chargedToday", chargedToday);
                 finalModel.put("totalPaid", totalPaid);
-
 
                 afterCommitEmailWork = () -> {
                     try {

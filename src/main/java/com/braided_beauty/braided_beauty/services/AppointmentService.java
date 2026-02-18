@@ -32,6 +32,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -101,6 +102,13 @@ public class AppointmentService {
         appointment.setRemainingBalance(pricingBreakdown.postDepositBalance());
         appointment.setDiscountAmount(pricingBreakdown.promoDiscount());
         appointment.setTotalAmount(pricingBreakdown.subtotal());
+        appointment.setServicePriceAtBooking(service.getPrice());
+        appointment.setSubtotalAtBooking(pricingBreakdown.subtotal());
+        appointment.setPostDepositBalanceAtBooking(pricingBreakdown.postDepositBalance());
+        appointment.setAddOnsTotalAtBooking(pricingBreakdown.subtotal()
+                .subtract(Objects.requireNonNullElse(service.getPrice(), BigDecimal.ZERO))
+                .setScale(2, RoundingMode.HALF_UP)
+        );
 
         // save appointment row (+ create deposit session if needed)
         try {
