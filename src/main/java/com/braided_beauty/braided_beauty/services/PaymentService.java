@@ -541,6 +541,7 @@ public class PaymentService {
                 appointment.setRemainingBalance(BigDecimal.ZERO);
                 appointment.setCompletedAt(LocalDateTime.now());
                 appointment.setTipAmount(payment.getTipAmount());
+                appointment.setTotalAmount(totalPaid);
 
                 if (appointment.getUser() == null) {
                     log.info("Skipping loyalty reward (guest appointment {})", appointmentId);
