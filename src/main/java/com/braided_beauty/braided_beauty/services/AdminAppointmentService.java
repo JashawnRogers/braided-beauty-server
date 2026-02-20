@@ -6,8 +6,7 @@ import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
-import com.braided_beauty.braided_beauty.exceptions.ConflictException;
-import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
+import com.braided_beauty.braided_beauty.exceptions.*;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.Appointment;
@@ -77,8 +76,14 @@ public class AdminAppointmentService {
         Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
                 .orElseThrow(() -> new NotFoundException("Appointment not found with ID: " + dto.getAppointmentId()));
 
-        if (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED) {
+        if (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED
+            || appointment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL
+        ) {
             throw new ConflictException("Appointment has already been completed");
+        }
+
+        if (dto.getTipAmount() != null && dto.getTipAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new com.braided_beauty.braided_beauty.exceptions.BadRequestException("Tip amount cannot be negative");
         }
 
         if (dto.getNote() != null && !dto.getNote().isBlank()) {
@@ -118,23 +123,14 @@ public class AdminAppointmentService {
 
         paymentRepository.save(finalPayment);
 
-        // Keep appointment totals consistent for admin UI / receipts
-        BigDecimal servicePrice = Objects.requireNonNullElse(appointment.getService().getPrice(), BigDecimal.ZERO)
+        BigDecimal depositPaid = Objects.requireNonNullElse(appointment.getDepositAmount(), BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal addOnsTotal = appointment.getAddOns().stream()
-                .map(AddOn::getPrice)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
+        BigDecimal totalPaidOverall = depositPaid
+                .add(cashFinalAmount)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal subtotal = servicePrice.add(addOnsTotal).setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal discountAmount = Objects.requireNonNullElse(appointment.getDiscountAmount(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        // totalAmount = subtotal - discount + tip
-        appointment.setTotalAmount(subtotal.subtract(discountAmount).add(tip).setScale(2, RoundingMode.HALF_UP));
+        appointment.setTotalAmount(totalPaidOverall);
 
         appointment.setAppointmentStatus(AppointmentStatus.COMPLETED);
         appointment.setPaymentStatus(PaymentStatus.PAID_IN_FULL);
