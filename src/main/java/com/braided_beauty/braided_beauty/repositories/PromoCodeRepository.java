@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface PromoCodeRepository extends JpaRepository<PromoCode, UUID> {
     Optional<PromoCode> findByCodeIgnoreCase(String discountCode);
+    boolean existsByCodeIgnoreCase(String codeName);
 }
