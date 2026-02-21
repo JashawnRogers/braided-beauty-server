@@ -12,7 +12,7 @@ public record PromoCodeDTO(
         String codeName,
         DiscountType discountType,
         BigDecimal value,
-        boolean active,
+        Boolean active,
         LocalDateTime startsAt,
         LocalDateTime endsAt,
         Integer maxRedemptions,

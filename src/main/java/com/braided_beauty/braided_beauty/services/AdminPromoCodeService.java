@@ -1,7 +1,9 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
+import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.PromoCode;
+import com.braided_beauty.braided_beauty.records.DiscountType;
 import com.braided_beauty.braided_beauty.records.PromoCodeDTO;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
 import lombok.AllArgsConstructor;
@@ -84,6 +86,112 @@ public class AdminPromoCodeService {
                 .maxRedemptions(maxRedemptions)
                 .timesRedeemed(0)
                 .build();
+
+        PromoCode saved;
+        try {
+            saved = promoCodeRepository.save(promoCode);
+        } catch (DataIntegrityViolationException ex) {
+            throw new DuplicateEntityException("Promo codes cannot share the same name.");
+        }
+
+        return PromoCodeDTO.builder()
+                .id(saved.getId())
+                .codeName(saved.getCode())
+                .discountType(saved.getDiscountType())
+                .value(saved.getValue())
+                .active(saved.isActive())
+                .startsAt(saved.getStartsAt())
+                .endsAt(saved.getEndsAt())
+                .maxRedemptions(saved.getMaxRedemptions())
+                .timesRedeemed(saved.getTimesRedeemed())
+                .build();
+    }
+
+    @Transactional
+    PromoCodeDTO updatePromoCode(PromoCodeDTO dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("PromoCode payload is required.");
+        }
+        if (dto.id() == null) {
+            throw new IllegalArgumentException("PromoCode ID is required.");
+        }
+
+        PromoCode promoCode = promoCodeRepository.findById(dto.id())
+                .orElseThrow(() -> new NotFoundException("Promo code not found."));
+
+        if (dto.codeName() != null && !dto.codeName().isBlank()) {
+            String newCodeName = dto.codeName().trim().toUpperCase(Locale.ROOT);
+
+            if (!newCodeName.equalsIgnoreCase(promoCode.getCode())) {
+                if (promoCodeRepository.existsByCodeIgnoreCase(newCodeName)) {
+                    throw new DuplicateEntityException("Promo codes cannot share the same name.");
+                }
+                promoCode.setCode(newCodeName);
+            }
+        }
+
+        if (dto.discountType() != null && dto.discountType() != promoCode.getDiscountType()) {
+            promoCode.setDiscountType(dto.discountType());
+        }
+
+        if (dto.value() != null) {
+            BigDecimal value = dto.value();
+
+            if (value.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Promo codes cannot have a negative value.");
+            }
+
+            DiscountType discountType = promoCode.getDiscountType();
+            if (discountType == null) {
+                throw new IllegalArgumentException("Promo codes must have a discount type.");
+            }
+
+            if (promoCode.getValue() != null && value.compareTo(promoCode.getValue()) != 0) {
+                switch (discountType) {
+                    case PERCENT -> {
+                        if (value.compareTo(new BigDecimal("100")) > 0) {
+                            throw new IllegalArgumentException("Discount percentage cannot exceed 100%.");
+                        }
+
+                        if (value.compareTo(BigDecimal.ONE) < 0) {
+                            throw new IllegalArgumentException("Discount percentage must be at least 1%.");
+                        }
+                        promoCode.setValue(value);
+                    }
+                    case AMOUNT -> promoCode.setValue(value);
+                }
+            }
+        }
+
+        if (dto.active() != null && dto.active() != promoCode.isActive()) {
+            promoCode.setActive(dto.active());
+        }
+
+        LocalDateTime newStartsAt = (dto.startsAt() != null) ? dto.startsAt() : promoCode.getStartsAt();
+        LocalDateTime newEndsAt = (dto.endsAt() != null) ? dto.endsAt() : promoCode.getEndsAt();
+
+        if (newStartsAt != null && newEndsAt != null && newEndsAt.isBefore(newStartsAt)) {
+            throw new IllegalArgumentException("Promo code end date cannot be before start date.");
+        }
+
+        if (dto.startsAt() != null
+                && (promoCode.getStartsAt() == null || !dto.startsAt().equals(promoCode.getStartsAt()))
+        ) {
+            promoCode.setStartsAt(dto.startsAt());
+        }
+
+        if (dto.endsAt() != null
+            && (promoCode.getEndsAt() == null || !dto.endsAt().equals(promoCode.getEndsAt()))
+        ) {
+            promoCode.setEndsAt(dto.endsAt());
+        }
+
+        if (dto.maxRedemptions() != null && !dto.maxRedemptions().equals(promoCode.getMaxRedemptions())) {
+            if (dto.maxRedemptions() < 0) {
+                throw new IllegalArgumentException("Max redemptions cannot be a negative number.");
+            }
+            promoCode.setMaxRedemptions(dto.maxRedemptions());
+        }
 
         PromoCode saved;
         try {
