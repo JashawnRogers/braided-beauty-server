@@ -1,10 +1,13 @@
 package com.braided_beauty.braided_beauty.services;
 
+import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.PromoCode;
 import com.braided_beauty.braided_beauty.records.DiscountType;
 import com.braided_beauty.braided_beauty.records.PromoCodeDTO;
+import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @AllArgsConstructor
 public class AdminPromoCodeService {
     private final PromoCodeRepository promoCodeRepository;
+    private final AppointmentRepository appointmentRepository;
 
     private static final LocalDateTime DEFAULT_STARTS_AT_DATE = LocalDateTime.MIN;
     private static final LocalDateTime DEFAULT_ENDS_AT_DATE = LocalDateTime.MAX;
@@ -211,5 +217,30 @@ public class AdminPromoCodeService {
                 .maxRedemptions(saved.getMaxRedemptions())
                 .timesRedeemed(saved.getTimesRedeemed())
                 .build();
+    }
+
+    @Transactional
+    public void softDelete(UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException("Promo code ID is required to delete promo.");
+        }
+
+        PromoCode promoCode = promoCodeRepository.findById(id)
+                        .orElseThrow(() -> new NotFoundException("Promo code not found"));
+
+        boolean inUseByActiveAppointments =
+                appointmentRepository.existsByPromoCode_IdAndAppointmentStatusIn(promoCode.getId(),
+                        List.of(AppointmentStatus.PENDING_CONFIRMATION, AppointmentStatus.CONFIRMED));
+
+        if (inUseByActiveAppointments) {
+            throw new ConflictException(
+                    "Cannot delete promo code because it is applied to active appointments. Deactivate it instead."
+            );
+        }
+
+        if (promoCode.isActive()) {
+            promoCode.setActive(false);
+            promoCodeRepository.save(promoCode);
+        }
     }
 }

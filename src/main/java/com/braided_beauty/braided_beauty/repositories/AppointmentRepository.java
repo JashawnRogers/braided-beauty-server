@@ -78,9 +78,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
     Optional<Appointment> findByStripeSessionId(String sessionId);
     List<Appointment> findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(LocalDateTime start, LocalDateTime end);
-    List<Appointment> findAllByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
-    Optional<Appointment> findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(UUID userId, LocalDateTime now,
-                                                                                       Collection<AppointmentStatus> status);
+    Optional<Appointment> findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(UUID userId, LocalDateTime now, Collection<AppointmentStatus> status);
+    boolean existsByPromoCode_IdAndAppointmentStatusIn(UUID promoCodeId, Collection<AppointmentStatus> statuses);
+
     Page<Appointment> findByUser_IdAndAppointmentStatusInOrderByAppointmentTimeDesc(
             UUID userId,
             Collection<AppointmentStatus> statuses,
