@@ -41,8 +41,28 @@ public class AdminPromoCodeService {
         }
         code = code.toUpperCase(Locale.ROOT);
 
-        if (promoCodeRepository.existsByCodeIgnoreCase(code)) {
-            throw new DuplicateEntityException("Promo codes cannot share the same name.");
+        PromoCode existingPromoCode = promoCodeRepository.findByCodeIgnoreCase(code)
+                .orElse(null);
+
+        if (existingPromoCode != null) {
+            if (existingPromoCode.isActive()) {
+                throw new DuplicateEntityException(
+                        "Promo code with name already exists and cannot share the same name.");
+            }
+
+            PromoCodeDTO dtoFromExistingPromo = PromoCodeDTO.builder()
+                    .id(existingPromoCode.getId())
+                    .codeName(dto.codeName())
+                    .discountType(dto.discountType())
+                    .value(dto.value())
+                    .active(dto.active())
+                    .startsAt(dto.startsAt())
+                    .endsAt(dto.endsAt())
+                    .maxRedemptions(dto.maxRedemptions())
+                    .timesRedeemed(0)
+                    .build();
+
+            return updatePromoCode(dtoFromExistingPromo);
         }
 
         if (dto.discountType() == null) {
@@ -90,7 +110,6 @@ public class AdminPromoCodeService {
                 .startsAt(startsAt)
                 .endsAt(endsAt)
                 .maxRedemptions(maxRedemptions)
-                .timesRedeemed(0)
                 .build();
 
         PromoCode saved;
