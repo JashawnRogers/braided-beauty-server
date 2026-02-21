@@ -9,8 +9,14 @@ import com.braided_beauty.braided_beauty.records.DiscountType;
 import com.braided_beauty.braided_beauty.records.PromoCodeDTO;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
+import com.braided_beauty.braided_beauty.utils.PromoCodeSpecifications;
 import lombok.AllArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -261,5 +267,39 @@ public class AdminPromoCodeService {
             promoCode.setActive(false);
             promoCodeRepository.save(promoCode);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PromoCodeDTO> listPromoCodes(String q, Boolean active, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+
+        Pageable pageable = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+        Specification<PromoCode> spec = Specification.allOf(
+                PromoCodeSpecifications.codeContainsIgnoreCase(q),
+                PromoCodeSpecifications.hasActive(active)
+        );
+
+
+        return promoCodeRepository.findAll(spec, pageable)
+                .map(this::toDto);
+    }
+
+    private PromoCodeDTO toDto(PromoCode p) {
+        return PromoCodeDTO.builder()
+                .id(p.getId())
+                .codeName(p.getCode())
+                .discountType(p.getDiscountType())
+                .value(p.getValue())
+                .active(p.isActive())
+                .startsAt(p.getStartsAt())
+                .endsAt(p.getEndsAt())
+                .maxRedemptions(p.getMaxRedemptions())
+                .timesRedeemed(p.getTimesRedeemed())
+                .build();
     }
 }
