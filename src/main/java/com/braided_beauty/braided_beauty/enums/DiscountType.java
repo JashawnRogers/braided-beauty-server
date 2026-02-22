@@ -1,4 +1,4 @@
-package com.braided_beauty.braided_beauty.records;
+package com.braided_beauty.braided_beauty.enums;
 
 public enum DiscountType {
     PERCENT,

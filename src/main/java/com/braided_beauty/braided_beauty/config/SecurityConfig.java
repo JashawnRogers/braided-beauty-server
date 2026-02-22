@@ -86,6 +86,7 @@ public class SecurityConfig {
                                 "/api/v1/business/**",
                                 "/api/v1/email/**",
                                 "/api/v1/hours",
+                                "/api/v1/pricing/**",
                                 "/error"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhook/stripe").permitAll()

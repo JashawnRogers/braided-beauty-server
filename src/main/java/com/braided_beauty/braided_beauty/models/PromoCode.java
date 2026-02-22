@@ -1,7 +1,6 @@
 package com.braided_beauty.braided_beauty.models;
 
-import com.braided_beauty.braided_beauty.records.DiscountType;
-import jakarta.annotation.Nullable;
+import com.braided_beauty.braided_beauty.enums.DiscountType;
 import jakarta.persistence.*;
 import lombok.*;
 

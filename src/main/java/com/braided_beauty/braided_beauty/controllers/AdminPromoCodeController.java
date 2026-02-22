@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/admin/promo-codes")
+@RequestMapping("/api/v1/admin/promo-codes")
 @AllArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminPromoCodeController {

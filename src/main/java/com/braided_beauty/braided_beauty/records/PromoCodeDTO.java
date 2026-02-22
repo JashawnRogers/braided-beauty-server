@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.records;
 
+import com.braided_beauty.braided_beauty.enums.DiscountType;
 import lombok.Builder;
 
 import java.math.BigDecimal;

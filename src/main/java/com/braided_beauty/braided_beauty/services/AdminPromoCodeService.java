@@ -5,7 +5,7 @@ import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.PromoCode;
-import com.braided_beauty.braided_beauty.records.DiscountType;
+import com.braided_beauty.braided_beauty.enums.DiscountType;
 import com.braided_beauty.braided_beauty.records.PromoCodeDTO;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
