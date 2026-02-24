@@ -1,6 +1,7 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
+import com.braided_beauty.braided_beauty.exceptions.BadRequestException;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.exceptions.DuplicateEntityException;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
@@ -68,7 +69,7 @@ public class AdminPromoCodeService {
                     .timesRedeemed(0)
                     .build();
 
-            return updatePromoCode(dtoFromExistingPromo);
+            return updatePromoCode(dtoFromExistingPromo, dtoFromExistingPromo.id());
         }
 
         if (dto.discountType() == null) {
@@ -139,12 +140,19 @@ public class AdminPromoCodeService {
     }
 
     @Transactional
-    PromoCodeDTO updatePromoCode(PromoCodeDTO dto) {
+    public PromoCodeDTO updatePromoCode(PromoCodeDTO dto, UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException("Promo code ID is required to update.");
+        }
         if (dto == null) {
             throw new IllegalArgumentException("PromoCode payload is required.");
         }
         if (dto.id() == null) {
             throw new IllegalArgumentException("PromoCode ID is required.");
+        }
+
+        if (!id.equals(dto.id())) {
+            throw new IllegalArgumentException("Path ID must match payload ID.");
         }
 
         PromoCode promoCode = promoCodeRepository.findById(dto.id())
@@ -287,6 +295,17 @@ public class AdminPromoCodeService {
 
         return promoCodeRepository.findAll(spec, pageable)
                 .map(this::toDto);
+    }
+
+    public PromoCodeDTO getPromoCode(UUID id) {
+        if (id == null) {
+            throw new BadRequestException("Must send ID to retrieve promo code.");
+        }
+
+        PromoCode promoCode = promoCodeRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Promo code not found."));
+
+        return toDto(promoCode);
     }
 
     private PromoCodeDTO toDto(PromoCode p) {
