@@ -33,8 +33,7 @@ public class AdminPromoCodeService {
     private final PromoCodeRepository promoCodeRepository;
     private final AppointmentRepository appointmentRepository;
 
-    private static final LocalDateTime DEFAULT_STARTS_AT_DATE = LocalDateTime.MIN;
-    private static final LocalDateTime DEFAULT_ENDS_AT_DATE = LocalDateTime.MAX;
+
     private static final Integer DEFAULT_MAX_REDEMPTIONS = 9999;
 
 
@@ -97,11 +96,11 @@ public class AdminPromoCodeService {
             case AMOUNT -> {}
         }
 
-        LocalDateTime startsAt = (dto.startsAt() == null) ? DEFAULT_STARTS_AT_DATE : dto.startsAt();
-        LocalDateTime endsAt = (dto.endsAt() == null) ? DEFAULT_ENDS_AT_DATE : dto.endsAt();
+        LocalDateTime startsAt = dto.startsAt();
+        LocalDateTime endsAt = dto.endsAt();
 
-        if (endsAt.isBefore(startsAt)) {
-            throw new IllegalArgumentException("Promo code end date cannot be before start date.");
+        if (startsAt != null && endsAt.isBefore(startsAt) && endsAt.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Promo code end date cannot be before today or start date.");
         }
 
         Integer maxRedemptions = (dto.maxRedemptions() == null) ? DEFAULT_MAX_REDEMPTIONS : dto.maxRedemptions();
@@ -117,13 +116,21 @@ public class AdminPromoCodeService {
                 .startsAt(startsAt)
                 .endsAt(endsAt)
                 .maxRedemptions(maxRedemptions)
+                .timesRedeemed(0)
                 .build();
 
         PromoCode saved;
         try {
             saved = promoCodeRepository.save(promoCode);
         } catch (DataIntegrityViolationException ex) {
-            throw new DuplicateEntityException("Promo codes cannot share the same name.");
+            Throwable root = ex.getMostSpecificCause();
+            String msg = root != null ? root.getMessage() : "";
+
+            if (msg != null && msg.contains("uk_promo_code")) {
+                throw new DuplicateEntityException("Promo codes cannot share the same name.");
+            }
+
+            throw new BadRequestException("Invalid promo code data.");
         }
 
         return PromoCodeDTO.builder()

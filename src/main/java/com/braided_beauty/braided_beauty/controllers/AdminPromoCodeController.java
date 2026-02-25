@@ -21,7 +21,7 @@ public class AdminPromoCodeController {
     @GetMapping
     public ResponseEntity<Page<PromoCodeDTO>> list(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false, defaultValue = "true") Boolean active,
+            @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
