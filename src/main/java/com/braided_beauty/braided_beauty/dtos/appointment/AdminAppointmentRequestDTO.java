@@ -30,6 +30,8 @@ public class AdminAppointmentRequestDTO {
 
     private final LocalDateTime appointmentTime;
 
+    private final BigDecimal fee;
+
     private final UUID serviceId; // In case the admin needs to adjust the service provided
 
     private final List<UUID> addOnIds; // In case the admin needs to add or remove add-ons

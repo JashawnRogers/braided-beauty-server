@@ -48,6 +48,9 @@ public class Payment {
     @Column(name = "refunded_amount")
     private BigDecimal refundedAmount;
 
+    @Column(name = "fee")
+    private BigDecimal fee;
+
     @ManyToOne
     private Appointment appointment;
     @ManyToOne

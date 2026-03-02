@@ -70,6 +70,9 @@ public class Appointment {
     @Column(name = "tip_amount")
     private BigDecimal tipAmount;
 
+    @Column(name = "fee")
+    private BigDecimal fee;
+
     @Column(name = "remaining_balance")
     private BigDecimal remainingBalance; // = (amount of base service + any add-ons) - deposit
 

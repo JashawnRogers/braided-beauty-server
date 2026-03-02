@@ -70,6 +70,7 @@ public class AppointmentDtoMapper {
         ServiceModel service = appointment.getService();
         UUID serviceId = service != null ? service.getId() : null;
         String serviceName = service != null ? service.getName() : null;
+        BigDecimal fee = Objects.requireNonNullElse(appointment.getFee(), BigDecimal.ZERO);
 
         BigDecimal servicePrice = Optional.ofNullable(service)
                 .map(ServiceModel::getPrice)
@@ -140,6 +141,7 @@ public class AppointmentDtoMapper {
                 .note(appointment.getNote())
                 .discountAmount(discount.setScale(2, RoundingMode.HALF_UP))
                 .discountPercent(Optional.ofNullable(appointment.getDiscountPercent()).orElse(0))
+                .fee(fee)
                 .build();
     }
 }

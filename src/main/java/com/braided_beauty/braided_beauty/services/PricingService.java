@@ -42,6 +42,7 @@ public class PricingService {
         BigDecimal subtotal = money(computeSubtotal(appointment));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
         BigDecimal postDepositBalance = money(subtotal.subtract(deposit));
+        BigDecimal fee = Objects.requireNonNullElse(money(appointment.getFee()), BigDecimal.ZERO);
 
         PromoCode promo = appointment.getPromoCode();
         BigDecimal promoDiscount = money(computePromoDiscount(promo, postDepositBalance));
@@ -50,8 +51,8 @@ public class PricingService {
         if (amountDueBeforeTip.compareTo(BigDecimal.ZERO) < 0) amountDueBeforeTip = money(BigDecimal.ZERO);
 
         BigDecimal tip = money(Objects.requireNonNullElse(appointment.getTipAmount(), BigDecimal.ZERO));
-        BigDecimal amountDue = money(amountDueBeforeTip.add(tip));
-        if (amountDue.compareTo(BigDecimal.ZERO) < 0) amountDue = money(BigDecimal.ZERO);
+        BigDecimal amountDuePlusTipAndFee = money(amountDueBeforeTip.add(tip).add(fee));
+        if (amountDuePlusTipAndFee.compareTo(BigDecimal.ZERO) < 0) amountDuePlusTipAndFee = money(BigDecimal.ZERO);
 
         return new PricingBreakdown(
                 subtotal,
@@ -60,7 +61,8 @@ public class PricingService {
                 promoDiscount,
                 amountDueBeforeTip,
                 tip,
-                amountDue
+                fee,
+                amountDuePlusTipAndFee
         );
     }
 

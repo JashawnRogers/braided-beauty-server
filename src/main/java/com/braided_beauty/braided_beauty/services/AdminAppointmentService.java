@@ -23,7 +23,6 @@ import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.coyote.BadRequestException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -174,10 +174,30 @@ public class AdminAppointmentService {
             }
         }
 
-        // Need to adjust so that if a tip amount is decreased, it correctly updates the remaining balance
-        // And vice versa
         if (dto.getTipAmount() != null) {
-            appointment.setTipAmount(dto.getTipAmount());
+            requireNonNegative(dto.getTipAmount(), "Tip amount");
+
+            applyPostBookingAdjustment(
+                    appointment,
+                    appointment.getTipAmount(),
+                    dto.getTipAmount(),
+                    appointment::setTipAmount
+            );
+        }
+
+        if (dto.getFee() != null) {
+            requireNonNegative(dto.getFee(), "Fee");
+
+            applyPostBookingAdjustment(
+                    appointment,
+                    appointment.getFee(),
+                    dto.getFee(),
+                    appointment::setFee
+            );
+        }
+
+        if (money(appointment.getRemainingBalance()).compareTo(BigDecimal.ZERO) < 0) {
+            appointment.setRemainingBalance(BigDecimal.ZERO);
         }
 
         if (dto.getAppointmentStatus() != null
@@ -192,10 +212,9 @@ public class AdminAppointmentService {
         }
 
 
-        if (dto.getAppointmentStatus() == AppointmentStatus.CANCELED) {
-            if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()) {
-                appointment.setCancelReason(dto.getCancelReason().trim());
-            }
+        if (dto.getCancelReason() != null && !dto.getCancelReason().isBlank()
+                && appointment.getAppointmentStatus() == AppointmentStatus.CANCELED) {
+            appointment.setCancelReason(dto.getCancelReason().trim());
         }
 
         appointment.setUpdatedAt(LocalDateTime.now());
@@ -226,5 +245,41 @@ public class AdminAppointmentService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
         return appointmentDtoMapper.toAdminSummaryDTO(appointment);
+    }
+
+    private static BigDecimal money(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
+    }
+
+    private static void requireNonNegative(BigDecimal v, String field) {
+        if (v != null && v.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException(field + " cannot be negative.");
+        }
+    }
+
+    private static void applyPostBookingAdjustment(
+            Appointment appointment,
+            BigDecimal oldValue,
+            BigDecimal newValue,
+            Consumer<BigDecimal> setter
+    ) {
+        BigDecimal oldV = money(oldValue);
+        BigDecimal newV = money(newValue);
+
+        BigDecimal delta = newV.subtract(oldV);
+
+        // Update the field
+        setter.accept(newV);
+
+        // Total always changes
+        appointment.setTotalAmount(money(appointment.getTotalAmount()).add(delta));
+
+        // Remaining balance only changes if there's still something owed
+        if (appointment.getPaymentStatus() != PaymentStatus.PAID_IN_FULL
+                && appointment.getAppointmentStatus() != AppointmentStatus.COMPLETED
+                && appointment.getAppointmentStatus() != AppointmentStatus.CANCELED) {
+
+            appointment.setRemainingBalance(money(appointment.getRemainingBalance()).add(delta));
+        }
     }
 }

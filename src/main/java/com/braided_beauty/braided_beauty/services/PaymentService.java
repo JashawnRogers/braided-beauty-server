@@ -190,6 +190,9 @@ public class PaymentService {
             throw new IllegalStateException("Missing cancelUrl");
         }
 
+        BigDecimal fee = Objects.requireNonNullElse(appointment.getFee(), BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
         tipAmount = Objects.requireNonNullElse(tipAmount, BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
         if (tipAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -202,10 +205,11 @@ public class PaymentService {
             throw new IllegalStateException("No remaining balance to pay");
         }
 
-        BigDecimal amountDuePlusTip = amountDueBeforeTip
+        BigDecimal amountDuePlusTipAndFee = amountDueBeforeTip
                 .add(tipAmount)
+                .add(fee)
                 .setScale(2, RoundingMode.HALF_UP);
-        if (amountDuePlusTip.compareTo(BigDecimal.ZERO) <= 0) {
+        if (amountDuePlusTipAndFee.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Final payment amount must be greater than 0");
         }
 
@@ -226,7 +230,7 @@ public class PaymentService {
                 BigDecimal existingAmount = Objects.requireNonNullElse(existing.getAmount(), BigDecimal.ZERO)
                         .setScale(2, RoundingMode.HALF_UP);
 
-                if (existingAmount.compareTo(amountDuePlusTip) != 0) {
+                if (existingAmount.compareTo(amountDuePlusTipAndFee) != 0) {
                     throw new ConflictException(
                             "A final payment session already exists. Please complete or cancel it before changing the total."
                     );
@@ -285,6 +289,26 @@ public class PaymentService {
                         .build()
         );
 
+        if (fee.compareTo(BigDecimal.ZERO) > 0) {
+            long feeInCents = fee.movePointRight(2).longValueExact();
+            lineItems.add(
+                    SessionCreateParams.LineItem.builder()
+                            .setQuantity(1L)
+                            .setPriceData(
+                                    SessionCreateParams.LineItem.PriceData.builder()
+                                            .setCurrency("usd")
+                                            .setUnitAmount(feeInCents)
+                                            .setProductData(
+                                                    SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                                            .setName("Fees")
+                                                            .build()
+                                            )
+                                            .build()
+                            )
+                            .build()
+            );
+        }
+
         if (tipAmount.compareTo(BigDecimal.ZERO) > 0) {
             long tipCents = tipAmount.movePointRight(2).longValueExact();
             lineItems.add(
@@ -313,7 +337,8 @@ public class PaymentService {
                         .putMetadata("amountDueBeforeTip", amountDueBeforeTip.toString())
                         .putMetadata("promoDiscount", promoDiscount.toString())
                         .putMetadata("tipAmount", tipAmount.toString())
-                        .putMetadata("finalAmountCharged", amountDuePlusTip.toString());
+                        .putMetadata("feeAmount", fee.toString())
+                        .putMetadata("finalAmountCharged", amountDuePlusTipAndFee.toString());
 
         if (promoText != null && !promoText.isBlank()) {
             paymentIntent.putMetadata("promoCode", promoText.trim().toUpperCase(Locale.ROOT));
@@ -335,13 +360,14 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
                 .stripePaymentIntentId(session.getPaymentIntent())
-                .amount(amountDuePlusTip) // Stripe charge = remaining + tip
+                .amount(amountDuePlusTipAndFee) // Stripe charge = remaining + tip + fee
                 .tipAmount(tipAmount)
                 .paymentStatus(PaymentStatus.PENDING_PAYMENT)
                 .paymentMethod(PaymentMethod.CARD)
                 .paymentType(PaymentType.FINAL)
                 .appointment(appointment)
                 .user(appointment.getUser())
+                .fee(fee)
                 .build();
 
         paymentRepository.save(payment);
@@ -560,6 +586,7 @@ public class PaymentService {
                 finalModel.put("depositAmount", deposit);
                 finalModel.put("tipAmount", tip);
                 finalModel.put("chargedToday", chargedToday);
+                finalModel.put("fee", appointment.getFee());
                 finalModel.put("totalPaid", totalPaid);
 
                 afterCommitEmailWork = () -> {
