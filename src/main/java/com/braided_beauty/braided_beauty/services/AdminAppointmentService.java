@@ -2,6 +2,7 @@ package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummaryDTO;
+import com.braided_beauty.braided_beauty.dtos.calendar.AdminCalendarEventDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
@@ -245,6 +246,21 @@ public class AdminAppointmentService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
         return appointmentDtoMapper.toAdminSummaryDTO(appointment);
+    }
+
+    public List<AdminCalendarEventDTO> getCalendarEvents(LocalDateTime start, LocalDateTime end) {
+        return appointmentRepository.findEventsInRange(start, end).stream()
+                .map(appointment -> AdminCalendarEventDTO.builder()
+                        .appointmentId(appointment.getId())
+                        .appointmentTime(appointment.getAppointmentTime())
+                        .durationMinutes(appointment.getDurationMinutes())
+                        .appointmentStatus(appointment.getAppointmentStatus())
+                        .serviceName(appointment.getService() != null ? appointment.getService().getName() : null)
+                        .calendarId(appointment.getScheduleCalendar().getId())
+                        .calendarName(appointment.getScheduleCalendar().getName())
+                        .calendarColor(appointment.getScheduleCalendar().getColor())
+                        .build())
+                .toList();
     }
 
     private static BigDecimal money(BigDecimal v) {

@@ -39,4 +39,7 @@ public class ServiceCreateDTO {
 
     @Nullable
     private List<UUID> addOnIds = List.of();
+
+    @Nullable
+    private UUID scheduleCalendarId;
 }

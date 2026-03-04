@@ -9,6 +9,7 @@ import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
 import com.braided_beauty.braided_beauty.models.AddOn;
 import com.braided_beauty.braided_beauty.models.ServiceCategory;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.models.ScheduleCalendar;
 import com.braided_beauty.braided_beauty.repositories.AddOnRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceCategoryRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
@@ -35,6 +36,7 @@ public class ServicesService {
     private final ServiceDtoMapper serviceDtoMapper;
     private final AddOnRepository addOnRepository;
     private final MediaService mediaService;
+    private final ScheduleCalendarService scheduleCalendarService;
 
     private final static Logger log = LoggerFactory.getLogger(ServicesService.class);
 
@@ -53,6 +55,8 @@ public class ServicesService {
         }
 
         ServiceModel entity = serviceDtoMapper.create(dto);
+        ScheduleCalendar scheduleCalendar = scheduleCalendarService.resolveByIdOrDefault(dto.getScheduleCalendarId());
+        entity.setScheduleCalendar(scheduleCalendar);
 
         if (dto.getCategoryId() != null) {
             ServiceCategory categoryProxy = categoryRepository.getReferenceById(dto.getCategoryId());
@@ -90,6 +94,10 @@ public class ServicesService {
                 : List.copyOf(existingService.getPhotoKeys());
 
         serviceDtoMapper.updateDto(dto, existingService);
+
+        if (dto.getScheduleCalendarId() != null) {
+            existingService.setScheduleCalendar(scheduleCalendarService.resolveByIdOrDefault(dto.getScheduleCalendarId()));
+        }
 
         if (dto.getAddOnIds() != null && !dto.getAddOnIds().isEmpty()) {
             existingService.setAddOns(addOnRepository.findAllById(dto.getAddOnIds()));

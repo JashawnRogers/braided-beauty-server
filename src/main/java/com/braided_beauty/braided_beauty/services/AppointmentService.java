@@ -15,6 +15,7 @@ import com.braided_beauty.braided_beauty.records.BookingConfirmationToken;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
 import com.braided_beauty.braided_beauty.records.PricingBreakdown;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
+import com.braided_beauty.braided_beauty.repositories.ScheduleCalendarRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import com.stripe.exception.StripeException;
@@ -64,6 +65,8 @@ public class AppointmentService {
     private final EmailTemplateService emailTemplateService;
     private final PricingService pricingService;
     private final PromoCodeValidationService promoCodeValidationService;
+    private final ScheduleCalendarService scheduleCalendarService;
+    private final ScheduleCalendarRepository scheduleCalendarRepository;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
 
@@ -83,11 +86,22 @@ public class AppointmentService {
 
         // service + add-ons
         attachServiceAndAddOns(appointment, service, dto);
+        appointment.setScheduleCalendar(service.getScheduleCalendar());
 
-        appointmentRepository.lockSchedule();
+        UUID calendarId = appointment.getScheduleCalendar().getId();
+        scheduleCalendarRepository.findByIdForUpdate(calendarId)
+                .orElseThrow(() -> new NotFoundException("Schedule calendar not found"));
+
+        assertWithinBookingWindow(appointment.getScheduleCalendar(), appointment.getAppointmentTime());
+        assertFitsWithinCalendarHours(
+                appointment,
+                appointment.getScheduleCalendar(),
+                businessSettingsService.getAppointmentBufferMinutes()
+        );
+        assertDailyCapNotReached(appointment.getScheduleCalendar(), appointment.getAppointmentTime().toLocalDate());
 
         // conflict check
-        assertNoConflicts(appointment, businessSettingsService.getAppointmentBufferMinutes());
+        assertNoConflicts(appointment, businessSettingsService.getAppointmentBufferMinutes(), calendarId);
 
         // promo code
         PromoCode promoCode = promoCodeValidationService.validateAndGetOrNull(dto.getPromoText());
@@ -151,7 +165,7 @@ public class AppointmentService {
             return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
 
         } catch (DataIntegrityViolationException ex) {
-            if (isAppointmentTimeUniqueViolation(ex)) {
+            if (isUniqueViolation(ex)) {
                 throw new ConflictException("That time was just booked. Please pick another time.");
             }
             throw ex;
@@ -249,12 +263,49 @@ public class AppointmentService {
                 .map(appointmentDtoMapper::toSummaryDTO);
     }
 
-    private void assertNoConflicts(Appointment appointment, int bufferMinutes) {
+    private void assertNoConflicts(Appointment appointment, int bufferMinutes, UUID calendarId) {
         LocalDateTime start = appointment.getAppointmentTime();
         LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
-        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes);
+        List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes, calendarId);
         if (!conflicts.isEmpty()) {
             throw new ConflictException("This time overlaps with another appointment.");
+        }
+    }
+
+    private void assertWithinBookingWindow(ScheduleCalendar calendar, LocalDateTime appointmentTime) {
+        if (!scheduleCalendarService.isWithinBookingWindow(calendar, appointmentTime)) {
+            throw new BadRequestException("The selected date is outside this calendar's booking window.");
+        }
+    }
+
+    private void assertFitsWithinCalendarHours(Appointment appointment, ScheduleCalendar calendar, int bufferMinutes) {
+        LocalDate date = appointment.getAppointmentTime().toLocalDate();
+        ScheduleCalendarService.EffectiveCalendarConstraints constraints =
+                scheduleCalendarService.getEffectiveCalendarConstraints(calendar, date);
+
+        if (constraints.isClosed() || constraints.openAt() == null || constraints.closeAt() == null) {
+            throw new BadRequestException("This calendar is closed for the selected date.");
+        }
+
+        LocalDateTime start = appointment.getAppointmentTime();
+        LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
+
+        if (start.isBefore(constraints.openAt()) || end.isAfter(constraints.closeAt())) {
+            throw new ConflictException("Appointment must fit within calendar hours including buffer.");
+        }
+    }
+
+    private void assertDailyCapNotReached(ScheduleCalendar calendar, LocalDate appointmentDate) {
+        if (calendar.getMaxBookingsPerDay() <= 0) {
+            return;
+        }
+
+        LocalDateTime dayStart = appointmentDate.atStartOfDay();
+        LocalDateTime dayEnd = appointmentDate.plusDays(1).atStartOfDay();
+
+        long currentBookings = appointmentRepository.countBlockingBookingsForDay(dayStart, dayEnd, calendar.getId());
+        if (currentBookings >= calendar.getMaxBookingsPerDay()) {
+            throw new ConflictException("This calendar has reached its booking limit for that day.");
         }
     }
 
@@ -295,11 +346,12 @@ public class AppointmentService {
         }
     }
 
-    private boolean isAppointmentTimeUniqueViolation(DataIntegrityViolationException ex) {
+    private boolean isUniqueViolation(DataIntegrityViolationException ex) {
         Throwable t = ex;
         while (t != null) {
             if (t instanceof ConstraintViolationException cve) {
-                return "uk_appointment_time".equals(cve.getConstraintName());
+                return "uk_appointment_time".equals(cve.getConstraintName())
+                        || "ux_appointments_calendar_time_active".equals(cve.getConstraintName());
             }
             t = t.getCause();
         }

@@ -27,11 +27,18 @@ public interface ServiceRepository extends JpaRepository<ServiceModel, UUID>, Jp
 
     boolean existsByCategoryId(UUID id);
 
-    @EntityGraph(attributePaths = {"category", "addOns"})
+    @EntityGraph(attributePaths = {"category", "addOns", "scheduleCalendar"})
     @Nonnull
     Page<ServiceModel> findAll(@Nullable Specification<ServiceModel> spec, @Nonnull Pageable pageable);
 
+    @Override
+    @EntityGraph(attributePaths = {"category", "addOns", "scheduleCalendar"})
+    Optional<ServiceModel> findById(UUID uuid);
+
+    @EntityGraph(attributePaths = {"category", "addOns", "scheduleCalendar"})
     Optional<List<ServiceModel>> findAllByCategoryId(UUID categoryId);
+
+    List<ServiceModel> findAllByScheduleCalendar_Id(UUID calendarId);
 
 
     // ---------- Monthly: most popular ----------

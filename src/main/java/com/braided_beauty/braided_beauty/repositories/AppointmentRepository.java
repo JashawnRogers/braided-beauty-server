@@ -13,7 +13,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import javax.swing.text.html.Option;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -28,6 +27,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                 FROM appointments a
                 WHERE a.appointment_time < :desiredEnd
                 AND (a.appointment_time + ((a.duration_minutes + :bufferMinutes) * interval '1 minute')) > :desiredStart
+                AND a.schedule_calendar_id = :calendarId
                 
                 AND (
                     a.appointment_status = 'CONFIRMED'
@@ -41,7 +41,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
            )
     List<Appointment> findConflictingAppointments(@Param("desiredStart") LocalDateTime desiredStart,
                                                   @Param("desiredEnd") LocalDateTime desiredEnd,
-                                                  @Param("bufferMinutes") int bufferMinutes
+                                                  @Param("bufferMinutes") int bufferMinutes,
+                                                  @Param("calendarId") UUID calendarId
                                                   );
 
     @Query(
@@ -50,6 +51,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
         FROM appointments a
         WHERE a.appointment_time >= :start
           AND a.appointment_time < :end
+          AND a.schedule_calendar_id = :calendarId
           AND (
                 a.appointment_status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')
                 OR (
@@ -64,7 +66,32 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     )
     List<Appointment> findBlockingAppointmentsForWindow(
             @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
+            @Param("end") LocalDateTime end,
+            @Param("calendarId") UUID calendarId
+    );
+
+    @Query(
+            value = """
+        SELECT count(*)
+        FROM appointments a
+        WHERE a.appointment_time >= :start
+          AND a.appointment_time < :end
+          AND a.schedule_calendar_id = :calendarId
+          AND (
+                a.appointment_status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')
+                OR (
+                    a.appointment_status = 'PENDING_CONFIRMATION'
+                    AND a.hold_expires_at IS NOT NULL
+                    AND a.hold_expires_at > now()
+                )
+          )
+    """,
+            nativeQuery = true
+    )
+    long countBlockingBookingsForDay(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("calendarId") UUID calendarId
     );
 
     @Query(value = """
@@ -77,6 +104,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     List<Appointment> findExpiredPendingHolds();
 
     Optional<Appointment> findByStripeSessionId(String sessionId);
+    boolean existsByScheduleCalendar_Id(UUID calendarId);
     List<Appointment> findAllByAppointmentTimeBetweenOrderByAppointmentTimeAsc(LocalDateTime start, LocalDateTime end);
     Optional<Appointment> findFirstByUserIdAndAppointmentTimeAfterAndAppointmentStatusInOrderByAppointmentTimeAsc(UUID userId, LocalDateTime now, Collection<AppointmentStatus> status);
     boolean existsByPromoCode_IdAndAppointmentStatusIn(UUID promoCodeId, Collection<AppointmentStatus> statuses);
@@ -87,9 +115,19 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
             Pageable pageable
     );
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT a FROM Appointment a WHERE a.id IS NOT NULL")
-    List<Appointment> lockSchedule();
+    @Query("""
+        SELECT a
+        FROM Appointment a
+        JOIN FETCH a.scheduleCalendar sc
+        LEFT JOIN FETCH a.service s
+        WHERE a.appointmentTime >= :start
+          AND a.appointmentTime < :end
+        ORDER BY a.appointmentTime ASC
+    """)
+    List<Appointment> findEventsInRange(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Appointment a WHERE a.id = :id")

@@ -15,14 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "appointments",
-        uniqueConstraints = {
-        @UniqueConstraint(
-                name = "uk_appointment_time",
-                columnNames = "appointment_time"
-            )
-        }
-)
+@Table(name = "appointments")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -42,10 +35,14 @@ public class Appointment {
     @JoinColumn(name = "service_id")
     private ServiceModel service;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "schedule_calendar_id", nullable = false)
+    private ScheduleCalendar scheduleCalendar;
+
     @Column(name = "guest_email")
     private String guestEmail;
 
-    @Column(name = "appointment_time", nullable = false, unique = true)
+    @Column(name = "appointment_time", nullable = false)
     private LocalDateTime appointmentTime;
 
     @Enumerated(EnumType.STRING)

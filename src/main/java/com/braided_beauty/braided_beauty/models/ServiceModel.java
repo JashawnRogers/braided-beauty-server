@@ -59,6 +59,10 @@ public class ServiceModel {
     @JoinColumn(name = "category_id", nullable = false)
     private ServiceCategory category;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "schedule_calendar_id", nullable = false)
+    private ScheduleCalendar scheduleCalendar;
+
     @ManyToMany
     @JoinTable(
             name = "service_addons",

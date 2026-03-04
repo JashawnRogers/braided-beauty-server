@@ -52,4 +52,7 @@ public class ServiceRequestDTO {
     private List<String> addPhotoKeys;
     @Nullable
     private List<String> removePhotoKeys;
+
+    @Nullable
+    private UUID scheduleCalendarId;
 }

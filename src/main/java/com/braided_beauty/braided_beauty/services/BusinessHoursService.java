@@ -3,13 +3,11 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.dtos.shared.BusinessHoursRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.shared.BusinessHoursResponseDTO;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.mappers.businessHours.BusinessHoursDtoMapper;
-import com.braided_beauty.braided_beauty.models.BusinessHours;
-import com.braided_beauty.braided_beauty.repositories.BusinessHoursRepository;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.braided_beauty.braided_beauty.models.ScheduleCalendar;
+import com.braided_beauty.braided_beauty.models.ScheduleCalendarHours;
+import com.braided_beauty.braided_beauty.repositories.ScheduleCalendarHoursRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,71 +15,96 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@AllArgsConstructor
-@Getter
+@RequiredArgsConstructor
+@Slf4j
 public class BusinessHoursService {
-    private final BusinessHoursRepository repo;
-    private final BusinessHoursDtoMapper mapper;
-    private static final Logger log = LoggerFactory.getLogger(BusinessHoursService.class);
+    private final ScheduleCalendarHoursRepository hoursRepository;
+    private final ScheduleCalendarService scheduleCalendarService;
 
     @Transactional
     public BusinessHoursResponseDTO create(BusinessHoursRequestDTO dto){
         validate(dto);
-        if (repo.existsByDayOfWeek(dto.getDayOfWeek())) {
+        ScheduleCalendar calendar = scheduleCalendarService.getDefaultCalendar();
+
+        if (hoursRepository.existsByCalendar_IdAndDayOfWeek(calendar.getId(), dto.getDayOfWeek())) {
             throw new IllegalArgumentException("Hours for " + dto.getDayOfWeek() + " already exists.");
         }
-        BusinessHours created = mapper.toEntity(dto);
-        repo.save(created);
-        log.info("Created new business hours entity. ID: {}", created.getId());
-        return mapper.toDTO(created);
+
+        ScheduleCalendarHours entity = toEntity(dto, calendar);
+        hoursRepository.save(entity);
+        log.info("Created default-calendar hours entity. ID: {}", entity.getId());
+        return toDto(entity);
     }
 
     @Transactional
     public BusinessHoursResponseDTO update(UUID id, BusinessHoursRequestDTO dto) {
         validate(dto);
 
-        BusinessHours entity = repo.findById(id)
+        ScheduleCalendarHours entity = hoursRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Business hours not found: " + id));
 
+        UUID calendarId = entity.getCalendar().getId();
         if (!entity.getDayOfWeek().equals(dto.getDayOfWeek())
-        &&  repo.existsByDayOfWeekAndIdNot(dto.getDayOfWeek(), id)) {
+                && hoursRepository.existsByCalendar_IdAndDayOfWeekAndIdNot(calendarId, dto.getDayOfWeek(), id)) {
             throw new IllegalArgumentException("Hours for " + dto.getDayOfWeek() + " already exist.");
         }
 
-        mapper.update(entity, dto);
+        entity.setDayOfWeek(dto.getDayOfWeek());
+        entity.setOpenTime(dto.getOpenTime());
+        entity.setCloseTime(dto.getCloseTime());
+        entity.setClosed(dto.isClosed());
 
         if (entity.isClosed()) {
             entity.setOpenTime(null);
             entity.setCloseTime(null);
         }
 
-        entity = repo.save(entity);
-        log.info("Updated business hours entity, ID: {}", entity.getId());
-        return mapper.toDTO(entity);
+        entity = hoursRepository.save(entity);
+        log.info("Updated hours entity, ID: {}", entity.getId());
+        return toDto(entity);
     }
 
     @Transactional
     public void delete(UUID id) {
-        if (!repo.existsById(id)) {
+        if (!hoursRepository.existsById(id)) {
             throw new NotFoundException("Business hours not found: " + id);
         }
-        log.info("Delete business hours entity ID: {}", id);
-        repo.deleteById(id);
+        log.info("Deleted hours entity ID: {}", id);
+        hoursRepository.deleteById(id);
     }
 
     public BusinessHoursResponseDTO getOne(UUID id) {
-        BusinessHours entity = repo.findById(id)
+        ScheduleCalendarHours entity = hoursRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Business hours not found: " + id));
-        log.info("Returning business hours entity, ID: {}", id);
-        return mapper.toDTO(entity);
+        return toDto(entity);
     }
 
     public List<BusinessHoursResponseDTO> getAll() {
-        log.info("Returning all business hours");
-        return repo.findAll()
+        ScheduleCalendar calendar = scheduleCalendarService.getDefaultCalendar();
+        return hoursRepository.findAllByCalendar_IdOrderByDayOfWeekAsc(calendar.getId())
                 .stream()
-                .map(mapper::toDTO)
+                .map(BusinessHoursService::toDto)
                 .toList();
+    }
+
+    private static ScheduleCalendarHours toEntity(BusinessHoursRequestDTO dto, ScheduleCalendar calendar) {
+        return ScheduleCalendarHours.builder()
+                .calendar(calendar)
+                .dayOfWeek(dto.getDayOfWeek())
+                .openTime(dto.getOpenTime())
+                .closeTime(dto.getCloseTime())
+                .isClosed(dto.isClosed())
+                .build();
+    }
+
+    private static BusinessHoursResponseDTO toDto(ScheduleCalendarHours entity) {
+        return BusinessHoursResponseDTO.builder()
+                .id(entity.getId())
+                .dayOfWeek(entity.getDayOfWeek())
+                .openTime(entity.getOpenTime())
+                .closeTime(entity.getCloseTime())
+                .isClosed(entity.isClosed())
+                .build();
     }
 
     private void validate(BusinessHoursRequestDTO dto) {
@@ -91,13 +114,13 @@ public class BusinessHoursService {
             }
             return;
         }
-        // open -> must HAVE both times
+
         if (dto.getOpenTime() == null || dto.getCloseTime() == null) {
             throw new IllegalArgumentException("Open days must include both openTime and closeTime");
         }
+
         if (!dto.getOpenTime().isBefore(dto.getCloseTime())) {
             throw new IllegalArgumentException("openTime must be before closeTime");
         }
-        }
     }
-
+}

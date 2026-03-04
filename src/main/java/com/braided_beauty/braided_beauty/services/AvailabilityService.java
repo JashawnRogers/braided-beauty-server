@@ -4,12 +4,10 @@ import com.braided_beauty.braided_beauty.dtos.timeSlots.AvailableTimeSlotsDTO;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
 import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
-import com.braided_beauty.braided_beauty.repositories.BusinessHoursRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -18,20 +16,36 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AvailabilityService {
     private final ServiceRepository serviceRepository;
-    private final BusinessHoursRepository businessHoursRepository;
     private final AppointmentRepository appointmentRepository;
     private final BusinessSettingsService businessSettingsService;
     private final AddOnService addOnService;
+    private final ScheduleCalendarService scheduleCalendarService;
 
 
     public List<AvailableTimeSlotsDTO> getAvailability(UUID serviceId, LocalDate date, List<UUID> addOnIds) {
         ServiceModel service = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new NotFoundException("Service not found with ID: " + serviceId));
 
-        BusinessHours workingDay = businessHoursRepository.findByDayOfWeek(date.getDayOfWeek())
-                .orElseThrow(() -> new NotFoundException("No business hours set for " + date.getDayOfWeek()));
+        ScheduleCalendar calendar = service.getScheduleCalendar();
+        if (calendar == null) {
+            throw new NotFoundException("Service is missing a schedule calendar");
+        }
 
-        if (workingDay.isClosed()) return List.of();
+        if (!scheduleCalendarService.isDateWithinBookingWindow(calendar, date)) {
+            return List.of();
+        }
+
+        ScheduleCalendarService.EffectiveCalendarConstraints constraints =
+                scheduleCalendarService.getEffectiveCalendarConstraints(calendar, date);
+        if (constraints.isClosed()) {
+            return List.of();
+        }
+
+        LocalDateTime dayStart = date.atStartOfDay();
+        LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
+        if (isDailyCapReached(calendar, dayStart, dayEnd)) {
+            return List.of();
+        }
 
         int slotMinutes = 30;
         int bufferMinutes = businessSettingsService.getAppointmentBufferMinutes();
@@ -49,8 +63,21 @@ public class AvailabilityService {
 
         int requestedDuration = serviceDuration + addOnMinutes;
 
-        LocalDateTime open = LocalDateTime.of(date, workingDay.getOpenTime());
-        LocalDateTime close = LocalDateTime.of(date, workingDay.getCloseTime());
+        LocalDateTime open = constraints.openAt();
+        LocalDateTime close = constraints.closeAt();
+        if (open == null || close == null) {
+            return List.of();
+        }
+
+        if (calendar.getBookingOpenAt() != null && calendar.getBookingOpenAt().isAfter(open)) {
+            open = calendar.getBookingOpenAt();
+        }
+        if (calendar.getBookingCloseAt() != null && calendar.getBookingCloseAt().isBefore(close)) {
+            close = calendar.getBookingCloseAt();
+        }
+        if (!open.isBefore(close)) {
+            return List.of();
+        }
 
         if (date.equals(LocalDate.now())) {
             LocalDateTime now = LocalDateTime.now();
@@ -62,7 +89,7 @@ public class AvailabilityService {
 
         // If single stylist: block against ALL appointments, not by serviceId.
         List<Appointment> appointments =
-                appointmentRepository.findBlockingAppointmentsForWindow(open, close);
+                appointmentRepository.findBlockingAppointmentsForWindow(open, close, calendar.getId());
 
         List<TimeRange> blocked = appointments.stream()
                 .map(a -> {
@@ -77,6 +104,9 @@ public class AvailabilityService {
                 .toList();
 
         LocalDateTime latestStart = close.minusMinutes(requestedDuration + bufferMinutes);
+        if (open.isAfter(latestStart)) {
+            return List.of();
+        }
 
         List<AvailableTimeSlotsDTO> out = new ArrayList<>();
         for (LocalDateTime slotStart = open; !slotStart.isAfter(latestStart); slotStart = slotStart.plusMinutes(slotMinutes)) {
@@ -95,6 +125,16 @@ public class AvailabilityService {
         }
 
         return out;
+    }
+
+    private boolean isDailyCapReached(ScheduleCalendar calendar, LocalDateTime dayStart, LocalDateTime dayEnd) {
+        int maxBookingsPerDay = calendar.getMaxBookingsPerDay();
+        if (maxBookingsPerDay <= 0) {
+            return false;
+        }
+
+        long currentBookings = appointmentRepository.countBlockingBookingsForDay(dayStart, dayEnd, calendar.getId());
+        return currentBookings >= maxBookingsPerDay;
     }
 
     private boolean isOverlap(LocalDateTime aStart, LocalDateTime aEnd, LocalDateTime bStart, LocalDateTime bEnd) {

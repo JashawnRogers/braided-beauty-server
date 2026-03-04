@@ -62,6 +62,7 @@ public class ServiceDtoMapper {
                 .id(service.getId())
                 .categoryName(service.getCategory().getName())
                 .categoryId(service.getCategory().getId())
+                .scheduleCalendarId(service.getScheduleCalendar().getId())
                 .name(service.getName())
                 .description(service.getDescription())
                 .price(service.getPrice())

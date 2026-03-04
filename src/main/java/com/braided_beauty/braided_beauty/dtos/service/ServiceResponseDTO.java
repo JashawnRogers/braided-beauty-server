@@ -17,6 +17,7 @@ public class ServiceResponseDTO {
     private UUID id;
     private String categoryName;
     private UUID categoryId;
+    private UUID scheduleCalendarId;
     private String name;
     private String description;
     private BigDecimal price;
