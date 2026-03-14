@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -38,6 +39,14 @@ public class Appointment {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "schedule_calendar_id", nullable = false)
     private ScheduleCalendar scheduleCalendar;
+
+    @OneToMany(mappedBy = "appointment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<AppointmentFee> appointmentFees = new ArrayList<>();
+
+    @Builder.Default
+    @Column(name = "fee_total")
+    private BigDecimal feeTotal = BigDecimal.ZERO;
 
     @Column(name = "guest_email")
     private String guestEmail;
@@ -66,9 +75,6 @@ public class Appointment {
 
     @Column(name = "tip_amount")
     private BigDecimal tipAmount;
-
-    @Column(name = "fee")
-    private BigDecimal fee;
 
     @Column(name = "remaining_balance")
     private BigDecimal remainingBalance; // = (amount of base service + any add-ons) - deposit
@@ -100,9 +106,11 @@ public class Appointment {
     @Column(name = "promo_code_text")
     private String promoCodeText;
 
+    @Builder.Default
     @Column(name = "discount_amount")
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(name = "discount_percent")
     private Integer discountPercent = 0;
 
@@ -122,6 +130,7 @@ public class Appointment {
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
+    @Builder.Default
     @Column(name = "loyalty_applied", nullable = false)
     private boolean loyaltyApplied = false;
 
@@ -162,4 +171,22 @@ public class Appointment {
         updatedAt = LocalDateTime.now();
     }
 
+    public void addAppointmentFee(AppointmentFee fee) {
+        appointmentFees.add(fee);
+        fee.setAppointment(this);
+    }
+
+    public void removeAppointmentFee(AppointmentFee fee) {
+        appointmentFees.remove(fee);
+        fee.setAppointment(null);
+    }
+
+    public BigDecimal computeTotalFeeAmount() {
+        if (appointmentFees == null || appointmentFees.isEmpty()) return BigDecimal.ZERO;
+
+        return appointmentFees.stream()
+                .map(AppointmentFee::getFeeAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 }

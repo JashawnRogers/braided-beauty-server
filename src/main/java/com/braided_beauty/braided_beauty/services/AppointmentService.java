@@ -119,11 +119,11 @@ public class AppointmentService {
         appointment.setServicePriceAtBooking(service.getPrice());
         appointment.setSubtotalAtBooking(pricingBreakdown.subtotal());
         appointment.setPostDepositBalanceAtBooking(pricingBreakdown.postDepositBalance());
-        appointment.setFee(pricingBreakdown.fee());
         appointment.setAddOnsTotalAtBooking(pricingBreakdown.subtotal()
                 .subtract(Objects.requireNonNullElse(service.getPrice(), BigDecimal.ZERO))
                 .setScale(2, RoundingMode.HALF_UP)
         );
+        appointment.setFeeTotal(BigDecimal.ZERO);
 
         // save appointment row (+ create deposit session if needed)
         try {

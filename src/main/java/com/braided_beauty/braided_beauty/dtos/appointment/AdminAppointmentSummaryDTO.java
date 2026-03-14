@@ -2,10 +2,7 @@ package com.braided_beauty.braided_beauty.dtos.appointment;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,6 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Getter
 @Setter
+@Data
 public class AdminAppointmentSummaryDTO {
     private final UUID id;
     private final LocalDateTime appointmentTime;
@@ -34,5 +32,6 @@ public class AdminAppointmentSummaryDTO {
     private final String note;
     private final BigDecimal discountAmount;
     private final Integer discountPercent;
-    private final BigDecimal fee;
+    private final List<UUID> feeIds;
+    private final BigDecimal feeTotal;
 }

@@ -1,10 +1,7 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
-import com.braided_beauty.braided_beauty.models.AddOn;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.PromoCode;
-import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.BookingPricingPreview;
 import com.braided_beauty.braided_beauty.records.PricingBreakdown;
 import com.braided_beauty.braided_beauty.records.PromoPreviewResult;
@@ -42,7 +39,6 @@ public class PricingService {
         BigDecimal subtotal = money(computeSubtotal(appointment));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
         BigDecimal postDepositBalance = money(subtotal.subtract(deposit));
-        BigDecimal fee = Objects.requireNonNullElse(money(appointment.getFee()), BigDecimal.ZERO);
 
         PromoCode promo = appointment.getPromoCode();
         BigDecimal promoDiscount = money(computePromoDiscount(promo, postDepositBalance));
@@ -51,8 +47,8 @@ public class PricingService {
         if (amountDueBeforeTip.compareTo(BigDecimal.ZERO) < 0) amountDueBeforeTip = money(BigDecimal.ZERO);
 
         BigDecimal tip = money(Objects.requireNonNullElse(appointment.getTipAmount(), BigDecimal.ZERO));
-        BigDecimal amountDuePlusTipAndFee = money(amountDueBeforeTip.add(tip).add(fee));
-        if (amountDuePlusTipAndFee.compareTo(BigDecimal.ZERO) < 0) amountDuePlusTipAndFee = money(BigDecimal.ZERO);
+        BigDecimal amountDuePlusTip = money(amountDueBeforeTip.add(tip));
+        if (amountDuePlusTip.compareTo(BigDecimal.ZERO) < 0) amountDuePlusTip = money(BigDecimal.ZERO);
 
         return new PricingBreakdown(
                 subtotal,
@@ -61,8 +57,7 @@ public class PricingService {
                 promoDiscount,
                 amountDueBeforeTip,
                 tip,
-                fee,
-                amountDuePlusTipAndFee
+                amountDuePlusTip
         );
     }
 

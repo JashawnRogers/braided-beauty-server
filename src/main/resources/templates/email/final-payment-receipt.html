@@ -46,6 +46,15 @@
                 <span th:text="${'$' + #numbers.formatDecimal(a.price, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
+        <!-- Fees -->
+        <tr th:each="b : ${fees}" th:if="${fees != null and !#lists.isEmpty(fees)}">
+            <td style="padding:6px 0; font-size:14px; color:#333;">
+                + <span th:text="${b.name}">Add-on</span>
+            </td>
+            <td align="right" style="padding:6px 0; font-size:14px; color:#333;">
+                <span th:text="${'$' + #numbers.formatDecimal(b.price, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
+            </td>
+        </tr>
 
         <!-- Divider -->
         <tr>
@@ -76,16 +85,6 @@
             <td style="padding:6px 0; font-size:14px;">Tip</td>
             <td align="right" style="padding:6px 0; font-size:14px;">
                 <span th:text="${'$' + #numbers.formatDecimal(tipAmount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
-            </td>
-        </tr>
-
-        <!-- Fee -->
-        <tr th:if="${fee != null and fee.signum() > 0}">
-            <td style="padding:6px 0; font-size:14px; color:#333;">
-                Additional Charges
-            </td>
-            <td align="right" style="padding:6px 0; font-size:14px; color:#333;">
-                <span th:text="${'$' + #numbers.formatDecimal(fee, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
             </td>
         </tr>
 

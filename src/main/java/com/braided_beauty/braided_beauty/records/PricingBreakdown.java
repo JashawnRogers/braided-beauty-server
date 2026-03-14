@@ -9,7 +9,6 @@ public record PricingBreakdown(
         BigDecimal promoDiscount,       // discount applied to postDepositBalance
         BigDecimal amountDueBeforeTip,  // postDepositBalance - promoDiscount (>= 0)
         BigDecimal tip,
-        BigDecimal fee,
-        BigDecimal amountDuePlusTipAndFee            // amountDueBeforeTip + tip (>= 0)
+        BigDecimal amountDuePlusTip            // amountDueBeforeTip + tip (>= 0)
 ) {
 }

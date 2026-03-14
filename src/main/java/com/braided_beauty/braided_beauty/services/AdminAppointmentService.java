@@ -9,21 +9,17 @@ import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.exceptions.*;
 import com.braided_beauty.braided_beauty.mappers.appointment.AppointmentDtoMapper;
-import com.braided_beauty.braided_beauty.models.AddOn;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.Payment;
-import com.braided_beauty.braided_beauty.models.ServiceModel;
+import com.braided_beauty.braided_beauty.models.*;
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.records.FrontendProps;
-import com.braided_beauty.braided_beauty.repositories.AddOnRepository;
-import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
-import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
-import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
+import com.braided_beauty.braided_beauty.repositories.*;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -45,8 +42,10 @@ public class AdminAppointmentService {
     private final ServiceRepository serviceRepository;
     private final AddOnRepository addOnRepository;
     private final PaymentRepository paymentRepository;
+    private final FeeRepository feeRepository;
     private final FrontendProps frontendProps;
     private final PaymentService paymentService;
+
 
     @Transactional
     public AdminAppointmentSummaryDTO adminCancelAppointment(AdminAppointmentRequestDTO dto) {
@@ -103,7 +102,9 @@ public class AdminAppointmentService {
         BigDecimal remainingDue = Objects.requireNonNullElse(appointment.getRemainingBalance(), BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal cashFinalAmount = remainingDue.add(tip).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal feeTotal = appointment.computeTotalFeeAmount();
+
+        BigDecimal cashFinalAmount = remainingDue.add(tip).add(feeTotal).setScale(2, RoundingMode.HALF_UP);
         if (cashFinalAmount.compareTo(BigDecimal.ZERO) < 0) {
             cashFinalAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
@@ -121,6 +122,7 @@ public class AdminAppointmentService {
         finalPayment.setStripePaymentIntentId(null);
         finalPayment.setTipAmount(tip);
         finalPayment.setAmount(cashFinalAmount);
+        finalPayment.setFee(feeTotal);
 
         paymentRepository.save(finalPayment);
 
@@ -145,11 +147,12 @@ public class AdminAppointmentService {
 
     @Transactional
     public AdminAppointmentSummaryDTO adminUpdateAppointment(UUID id, AdminAppointmentRequestDTO dto) throws BadRequestException {
+        log.info("Request DTO: {}", dto);
         if (dto.getAppointmentId() == null || !dto.getAppointmentId().equals(id)) {
             throw new BadRequestException("Path id and body appointmentId must match");
         }
 
-        Appointment appointment = appointmentRepository.findByIdForUpdate(dto.getAppointmentId())
+        Appointment appointment = appointmentRepository.findById(dto.getAppointmentId())
                 .orElseThrow(() -> new NotFoundException("Appointment not found with ID: " + dto.getAppointmentId()));
 
         if (dto.getNote() != null && !dto.getNote().isBlank()) {
@@ -186,15 +189,28 @@ public class AdminAppointmentService {
             );
         }
 
-        if (dto.getFee() != null) {
-            requireNonNegative(dto.getFee(), "Fee");
 
-            applyPostBookingAdjustment(
-                    appointment,
-                    appointment.getFee(),
-                    dto.getFee(),
-                    appointment::setFee
-            );
+        if (dto.getFeeIds() != null) {
+            List<AppointmentFee> existingFees = new ArrayList<>(appointment.getAppointmentFees());
+
+            for (AppointmentFee existingFee : existingFees) {
+                appointment.removeAppointmentFee(existingFee);
+            }
+            if (!dto.getFeeIds().isEmpty()) {
+                List<Fee> fees = feeRepository.findAllById(dto.getFeeIds());
+
+                if (fees.size() != dto.getFeeIds().size()) {
+                    throw new NotFoundException("One or more fees not found.");
+                }
+
+                List<AppointmentFee> appointmentFees = fees.stream()
+                        .map(this::addFee)
+                        .toList();
+
+                for (AppointmentFee aptFee : appointmentFees) {
+                    appointment.addAppointmentFee(aptFee);
+                }
+            }
         }
 
         if (money(appointment.getRemainingBalance()).compareTo(BigDecimal.ZERO) < 0) {
@@ -219,9 +235,13 @@ public class AdminAppointmentService {
         }
 
         appointment.setUpdatedAt(LocalDateTime.now());
+        appointment.setFeeTotal(appointment.computeTotalFeeAmount());
 
-        Appointment saved = appointmentRepository.save(appointment);
-        return appointmentDtoMapper.toAdminSummaryDTO(saved);
+        Appointment saved = appointmentRepository.saveAndFlush(appointment);
+
+        List<UUID> feeIds = dto.getFeeIds() != null ? dto.getFeeIds() : deriveFeeIds(saved);
+
+        return appointmentDtoMapper.toAdminSummaryDTO(saved, feeIds, appointment.getFeeTotal());
     }
 
     @Transactional
@@ -245,7 +265,10 @@ public class AdminAppointmentService {
     public AdminAppointmentSummaryDTO getAppointmentById(UUID id) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
-        return appointmentDtoMapper.toAdminSummaryDTO(appointment);
+
+        List<UUID> feeIds = deriveFeeIds(appointment);
+
+        return appointmentDtoMapper.toAdminSummaryDTO(appointment, feeIds, appointment.getFeeTotal());
     }
 
     public List<AdminCalendarEventDTO> getCalendarEvents(LocalDateTime start, LocalDateTime end) {
@@ -261,6 +284,14 @@ public class AdminAppointmentService {
                         .calendarColor(appointment.getScheduleCalendar().getColor())
                         .build())
                 .toList();
+    }
+
+    private AppointmentFee addFee(Fee fee) {
+        return AppointmentFee.builder()
+                .fee(fee)
+                .feeName(fee.getName())
+                .feeAmount(fee.getAmount())
+                .build();
     }
 
     private static BigDecimal money(BigDecimal v) {
@@ -297,5 +328,17 @@ public class AdminAppointmentService {
 
             appointment.setRemainingBalance(money(appointment.getRemainingBalance()).add(delta));
         }
+    }
+
+    private List<UUID> deriveFeeIds(Appointment appointment) {
+        if (appointment.getAppointmentFees() == null || appointment.getAppointmentFees().isEmpty()) {
+            return List.of();
+        }
+
+        return appointment.getAppointmentFees().stream()
+                .map(AppointmentFee::getFee)
+                .filter(Objects::nonNull)
+                .map(Fee::getId)
+                .toList();
     }
 }

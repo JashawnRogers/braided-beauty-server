@@ -10,7 +10,7 @@ import com.braided_beauty.braided_beauty.enums.DiscountType;
 import com.braided_beauty.braided_beauty.records.PromoCodeDTO;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
-import com.braided_beauty.braided_beauty.utils.PromoCodeSpecifications;
+import com.braided_beauty.braided_beauty.utils.SearchSpecifications;
 import lombok.AllArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -295,8 +295,8 @@ public class AdminPromoCodeService {
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
         Specification<PromoCode> spec = Specification.allOf(
-                PromoCodeSpecifications.codeContainsIgnoreCase(q),
-                PromoCodeSpecifications.hasActive(active)
+                SearchSpecifications.codeContainsIgnoreCase(q, "code"),
+                SearchSpecifications.hasActive(active, "active")
         );
 
 

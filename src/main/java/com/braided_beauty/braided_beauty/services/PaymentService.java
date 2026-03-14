@@ -190,8 +190,7 @@ public class PaymentService {
             throw new IllegalStateException("Missing cancelUrl");
         }
 
-        BigDecimal fee = Objects.requireNonNullElse(appointment.getFee(), BigDecimal.ZERO)
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal feeTotal = appointment.getFeeTotal().setScale(2, RoundingMode.HALF_UP);
 
         tipAmount = Objects.requireNonNullElse(tipAmount, BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -207,7 +206,7 @@ public class PaymentService {
 
         BigDecimal amountDuePlusTipAndFee = amountDueBeforeTip
                 .add(tipAmount)
-                .add(fee)
+                .add(feeTotal)
                 .setScale(2, RoundingMode.HALF_UP);
         if (amountDuePlusTipAndFee.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Final payment amount must be greater than 0");
@@ -289,8 +288,8 @@ public class PaymentService {
                         .build()
         );
 
-        if (fee.compareTo(BigDecimal.ZERO) > 0) {
-            long feeInCents = fee.movePointRight(2).longValueExact();
+        if (feeTotal.compareTo(BigDecimal.ZERO) > 0) {
+            long feeInCents = feeTotal.movePointRight(2).longValueExact();
             lineItems.add(
                     SessionCreateParams.LineItem.builder()
                             .setQuantity(1L)
@@ -337,7 +336,7 @@ public class PaymentService {
                         .putMetadata("amountDueBeforeTip", amountDueBeforeTip.toString())
                         .putMetadata("promoDiscount", promoDiscount.toString())
                         .putMetadata("tipAmount", tipAmount.toString())
-                        .putMetadata("feeAmount", fee.toString())
+                        .putMetadata("feeAmount", feeTotal.toString())
                         .putMetadata("finalAmountCharged", amountDuePlusTipAndFee.toString());
 
         if (promoText != null && !promoText.isBlank()) {
@@ -367,7 +366,7 @@ public class PaymentService {
                 .paymentType(PaymentType.FINAL)
                 .appointment(appointment)
                 .user(appointment.getUser())
-                .fee(fee)
+                .fee(feeTotal)
                 .build();
 
         paymentRepository.save(payment);
@@ -423,6 +422,10 @@ public class PaymentService {
 
         List<EmailAddOnLine> addOnLines = appointment.getAddOns().stream()
                 .map(a -> new EmailAddOnLine(a.getName(), a.getPrice()))
+                .toList();
+
+        List<EmailAddOnLine> feeLines = appointment.getAppointmentFees().stream()
+                .map(a -> new EmailAddOnLine(a.getFeeName(), a.getFeeAmount()))
                 .toList();
 
         String customerName = (appointment.getUser() != null ? appointment.getUser().getName() : "Guest");
@@ -546,7 +549,8 @@ public class PaymentService {
             }
             case FINAL -> {
                 BigDecimal serviceAmount = Objects.requireNonNullElse(appointment.getServicePriceAtBooking(), BigDecimal.ZERO);
-                BigDecimal tip = Objects.requireNonNullElse(payment.getTipAmount(), BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal tip = Objects.requireNonNullElse(payment.getTipAmount(), BigDecimal.ZERO)
+                        .setScale(2, RoundingMode.HALF_UP);
 
                 BigDecimal chargedToday = Objects.requireNonNullElse(payment.getAmount(), BigDecimal.ZERO)
                         .setScale(2, RoundingMode.HALF_UP);
@@ -586,7 +590,7 @@ public class PaymentService {
                 finalModel.put("depositAmount", deposit);
                 finalModel.put("tipAmount", tip);
                 finalModel.put("chargedToday", chargedToday);
-                finalModel.put("fee", appointment.getFee());
+                finalModel.put("fees", feeLines);
                 finalModel.put("totalPaid", totalPaid);
 
                 afterCommitEmailWork = () -> {

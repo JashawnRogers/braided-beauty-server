@@ -5,6 +5,7 @@ import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @AllArgsConstructor
 @Getter
+@Data
 public class AdminAppointmentRequestDTO {
     @NotNull
     private final UUID appointmentId;
@@ -30,7 +32,7 @@ public class AdminAppointmentRequestDTO {
 
     private final LocalDateTime appointmentTime;
 
-    private final BigDecimal fee;
+    private final List<UUID> feeIds;
 
     private final UUID serviceId; // In case the admin needs to adjust the service provided
 

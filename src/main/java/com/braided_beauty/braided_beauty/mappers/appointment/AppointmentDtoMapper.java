@@ -5,10 +5,7 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentResponseDTO;
 import com.braided_beauty.braided_beauty.dtos.appointment.AppointmentSummaryDTO;
 import com.braided_beauty.braided_beauty.mappers.service.ServiceDtoMapper;
-import com.braided_beauty.braided_beauty.models.AddOn;
-import com.braided_beauty.braided_beauty.models.Appointment;
-import com.braided_beauty.braided_beauty.models.ServiceModel;
-import com.braided_beauty.braided_beauty.models.User;
+import com.braided_beauty.braided_beauty.models.*;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -70,7 +67,6 @@ public class AppointmentDtoMapper {
         ServiceModel service = appointment.getService();
         UUID serviceId = service != null ? service.getId() : null;
         String serviceName = service != null ? service.getName() : null;
-        BigDecimal fee = Objects.requireNonNullElse(appointment.getFee(), BigDecimal.ZERO);
 
         BigDecimal servicePrice = Optional.ofNullable(service)
                 .map(ServiceModel::getPrice)
@@ -141,7 +137,87 @@ public class AppointmentDtoMapper {
                 .note(appointment.getNote())
                 .discountAmount(discount.setScale(2, RoundingMode.HALF_UP))
                 .discountPercent(Optional.ofNullable(appointment.getDiscountPercent()).orElse(0))
-                .fee(fee)
+                .build();
+    }
+
+    public AdminAppointmentSummaryDTO toAdminSummaryDTO(Appointment appointment, List<UUID> feeIds, BigDecimal feeTotal) {
+        // --- Service basics ---
+        ServiceModel service = appointment.getService();
+        UUID serviceId = service != null ? service.getId() : null;
+        String serviceName = service != null ? service.getName() : null;
+
+        BigDecimal servicePrice = Optional.ofNullable(service)
+                .map(ServiceModel::getPrice)
+                .orElse(BigDecimal.ZERO);
+
+        // --- Tip / Discount / Deposit (safe defaults) ---
+        BigDecimal tip = Optional.ofNullable(appointment.getTipAmount()).orElse(BigDecimal.ZERO);
+
+        BigDecimal discount = Optional.ofNullable(appointment.getDiscountAmount()).orElse(BigDecimal.ZERO);
+        BigDecimal safeDiscount = discount.compareTo(BigDecimal.ZERO) > 0 ? discount : BigDecimal.ZERO;
+
+        BigDecimal depositAmount = Optional.ofNullable(appointment.getDepositAmount()).orElse(BigDecimal.ZERO);
+
+        // --- Add-ons ---
+        List<AddOn> addOns = Optional.ofNullable(appointment.getAddOns()).orElseGet(List::of);
+
+        List<UUID> addOnIds = addOns.stream()
+                .map(AddOn::getId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        BigDecimal totalPriceOfAddOns = addOns.stream()
+                .map(AddOn::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // --- Recomputed total for admin display ---
+        BigDecimal subtotal = servicePrice.add(totalPriceOfAddOns);
+
+        BigDecimal totalAmount = subtotal
+                .subtract(safeDiscount)
+                .subtract(depositAmount)
+                .add(tip)
+                .add(feeTotal)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            totalAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // --- Customer info ---
+        User user = appointment.getUser();
+
+        String customerName =
+                (user != null && user.getName() != null && !user.getName().isBlank())
+                        ? user.getName()
+                        : "Guest";
+
+        String customerEmail =
+                (appointment.getGuestEmail() != null && !appointment.getGuestEmail().isBlank())
+                        ? appointment.getGuestEmail()
+                        : (user != null ? user.getEmail() : null);
+
+        return AdminAppointmentSummaryDTO.builder()
+                .id(appointment.getId())
+                .appointmentTime(appointment.getAppointmentTime())
+                .appointmentStatus(appointment.getAppointmentStatus())
+                .serviceId(serviceId)
+                .serviceName(serviceName)
+                .addOnIds(addOnIds)
+                .paymentStatus(appointment.getPaymentStatus())
+                .remainingBalance(appointment.getRemainingBalance())
+                .totalAmount(totalAmount)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .tipAmount(appointment.getTipAmount())
+                .createdAt(appointment.getCreatedAt())
+                .updatedAt(appointment.getUpdatedAt())
+                .note(appointment.getNote())
+                .discountAmount(discount.setScale(2, RoundingMode.HALF_UP))
+                .discountPercent(Optional.ofNullable(appointment.getDiscountPercent()).orElse(0))
+                .feeIds(feeIds)
+                .feeTotal(feeTotal)
                 .build();
     }
 }
