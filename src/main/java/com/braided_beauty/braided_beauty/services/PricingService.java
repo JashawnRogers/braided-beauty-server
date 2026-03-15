@@ -6,6 +6,7 @@ import com.braided_beauty.braided_beauty.records.BookingPricingPreview;
 import com.braided_beauty.braided_beauty.records.PricingBreakdown;
 import com.braided_beauty.braided_beauty.records.PromoPreviewResult;
 import com.braided_beauty.braided_beauty.repositories.AddOnRepository;
+import com.braided_beauty.braided_beauty.repositories.BusinessSettingsRepository;
 import com.braided_beauty.braided_beauty.repositories.PromoCodeRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import lombok.AllArgsConstructor;
@@ -15,10 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.Clock;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 
 @Service
@@ -27,14 +25,16 @@ public class PricingService {
     private final PromoCodeRepository promoCodeRepository;
     private final ServiceRepository serviceRepository;
     private final AddOnRepository addOnRepository;
+    private final BusinessSettingsService businessSettingsService;
     private final Clock clock;
 
     // REMINDER: pull DEPOSIT_RATE from BusinessSettings later
-    private static final BigDecimal DEPOSIT_RATE = new BigDecimal("0.25");
     private static final BigDecimal DIVISOR = new BigDecimal("100");
 
     public PricingBreakdown calculate(Appointment appointment) {
         Objects.requireNonNull(appointment, "Appointment cannot be null");
+
+        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage()).orElse(BigDecimal.ZERO);
 
         BigDecimal subtotal = money(computeSubtotal(appointment));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
@@ -104,6 +104,7 @@ public class PricingService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }
 
+        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage()).orElse(BigDecimal.ZERO);
         BigDecimal subtotal = money(servicePrice.add(addOnsTotal));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
         BigDecimal postDepositBalance = money(subtotal.subtract(deposit));

@@ -10,6 +10,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 
 @Slf4j
 @Service
@@ -39,6 +41,10 @@ public class BusinessSettingsService {
             settings.setCompanyPhoneNumber(normalizedPhoneNumber);
         }
 
+        if (dto.discountPercentage() != null && dto.discountPercentage().compareTo(BigDecimal.valueOf(100)) <= 0) {
+            settings.setDiscountPercentage(dto.discountPercentage());
+        }
+
         BusinessSettings saved = repository.save(settings);
 
         return BusinessSettingsDTO.builder()
@@ -46,6 +52,7 @@ public class BusinessSettingsService {
                 .companyAddress(saved.getCompanyAddress())
                 .companyEmail(saved.getCompanyEmail())
                 .companyPhoneNumber(saved.getCompanyPhoneNumber())
+                .discountPercentage(saved.getDiscountPercentage())
                 .build();
     }
 
@@ -57,6 +64,7 @@ public class BusinessSettingsService {
                 .companyAddress(settings.getCompanyAddress())
                 .companyEmail(settings.getCompanyEmail())
                 .companyPhoneNumber(settings.getCompanyPhoneNumber())
+                .discountPercentage(settings.getDiscountPercentage())
                 .build();
     }
 
