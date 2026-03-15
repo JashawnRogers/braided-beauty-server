@@ -29,6 +29,8 @@ public class UserMemberProfileResponseDTO {
     private final LocalDateTime updatedAt;
     @NotNull
     private final LocalDateTime createdAt;
+    @NotNull
+    private final boolean enabled;
     private final String phoneNumber;
     private final UserType userType;
     private final List<AppointmentResponseDTO> appointments;

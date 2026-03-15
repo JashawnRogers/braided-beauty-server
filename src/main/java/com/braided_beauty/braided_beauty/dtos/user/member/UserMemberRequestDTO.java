@@ -30,4 +30,6 @@ public class UserMemberRequestDTO {
     private final UserType userType;
     @NotNull
     private final LoyaltyRecord loyaltyRecord;
+    @NotNull
+    private final boolean enabled;
 }

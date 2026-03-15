@@ -332,6 +332,11 @@ public class AppointmentService {
         if (principal != null) {
             User user = userRepository.findById(principal.id())
                     .orElseThrow(() -> new NotFoundException("No user found with ID: " + principal.id()));
+
+            if (!user.isEnabled()) {
+                throw new UnauthorizedException("This account has been banned. You will no longer be able to book appointments.");
+            }
+
             appointment.setUser(user);
             appointment.setGuestEmail(null);
         } else {

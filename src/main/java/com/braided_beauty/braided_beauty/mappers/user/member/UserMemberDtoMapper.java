@@ -65,6 +65,7 @@ public class UserMemberDtoMapper {
                 .userType(user.getUserType())
                 .updatedAt(user.getUpdatedAt())
                 .createdAt(user.getCreatedAt())
+                .enabled(user.isEnabled())
                 .appointments(user.getAppointments()
                         .stream()
                         .map(appointmentDtoMapper::toDTO)
