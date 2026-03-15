@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 @AllArgsConstructor
 public class EmailService {
-    private JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
 
     public void sendHtmlEmail(String to, String subject, String html) {
         MimeMessage mimeMessage = mailSender.createMimeMessage();

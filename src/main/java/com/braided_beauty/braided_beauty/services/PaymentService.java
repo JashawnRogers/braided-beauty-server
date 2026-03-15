@@ -420,11 +420,15 @@ public class PaymentService {
             return;
         }
 
-        List<EmailAddOnLine> addOnLines = appointment.getAddOns().stream()
+        List<EmailAddOnLine> addOnLines = Optional.ofNullable(appointment.getAddOns())
+                .orElseGet(Collections::emptyList)
+                .stream()
                 .map(a -> new EmailAddOnLine(a.getName(), a.getPrice()))
                 .toList();
 
-        List<EmailAddOnLine> feeLines = appointment.getAppointmentFees().stream()
+        List<EmailAddOnLine> feeLines = Optional.ofNullable(appointment.getAppointmentFees())
+                .orElseGet(Collections::emptyList)
+                .stream()
                 .map(a -> new EmailAddOnLine(a.getFeeName(), a.getFeeAmount()))
                 .toList();
 

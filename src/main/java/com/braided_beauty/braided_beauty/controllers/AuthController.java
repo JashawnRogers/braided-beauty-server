@@ -3,9 +3,7 @@ package com.braided_beauty.braided_beauty.controllers;
 import com.braided_beauty.braided_beauty.dtos.user.auth.LoginRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
 import com.braided_beauty.braided_beauty.dtos.user.global.ChangePasswordRequestDTO;
-import com.braided_beauty.braided_beauty.records.AccessTokenResponse;
-import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
-import com.braided_beauty.braided_beauty.records.AuthResponse;
+import com.braided_beauty.braided_beauty.records.*;
 import com.braided_beauty.braided_beauty.services.*;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -25,6 +23,7 @@ import static com.braided_beauty.braided_beauty.services.RefreshTokenService.COO
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     public ResponseEntity<Void> login(@RequestBody @Valid LoginRequestDTO dto, HttpServletResponse res) {
@@ -60,7 +59,20 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestPasswordReset(request);
+        return ResponseEntity.noContent().build();
+    }
 
-
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(
+                request.token(),
+                request.newPassword(),
+                request.confirmPassword()
+        );
+        return ResponseEntity.noContent().build();
+    }
 
 }
