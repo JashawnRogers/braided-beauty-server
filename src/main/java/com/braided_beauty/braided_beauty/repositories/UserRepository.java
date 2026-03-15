@@ -15,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     List<User> findAllByUserType(UserType userType);
     Optional<User> findUserByEmail(String email);
     boolean existsByEmail(String email);
+    boolean existsByUserType(UserType userType);
     boolean existsByOauthProviderAndOauthSubject(String oAuthProvider, String oAuthSubject);
     Optional<User> findByOauthProviderAndOauthSubject(String oAuthProvider, String oAuthSubject);
     long countByUserType(UserType userType);

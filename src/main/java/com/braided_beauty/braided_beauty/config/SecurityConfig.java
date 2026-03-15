@@ -71,6 +71,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // OAuth entry
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bootstrap/admin").authenticated()
                         // Public API
                         .requestMatchers(
                                 "/api/v1/service/**",
