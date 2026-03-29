@@ -12,8 +12,11 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.util.StringUtils;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
@@ -25,11 +28,23 @@ public class JwtKeysConfig {
     private Resource privateKeyResource;
 
     @Value("${jwt.public-key}")
-    private Resource publicKeyResources;
+    private Resource publicKeyResource;
+
+    @Value("${jwt.private-key-pem}")
+    private String privateKeyPem;
+
+    @Value("${jwt.public-key-pem}")
+    private String publicKeyPem;
 
     // Parse PEMs into Java RSA key objects
     @Bean
     public RSAPrivateKey rsaPrivateKey() throws IOException {
+        if (StringUtils.hasText(privateKeyPem)) {
+            try (var in = new ByteArrayInputStream(privateKeyPem.getBytes(StandardCharsets.UTF_8))) {
+                return RsaKeyConverters.pkcs8().convert(in);
+            }
+        }
+
         try (var in = privateKeyResource.getInputStream()) {
             return RsaKeyConverters.pkcs8().convert(in);
         }
@@ -37,7 +52,13 @@ public class JwtKeysConfig {
 
     @Bean
     public RSAPublicKey rsaPublicKey() throws IOException {
-        try (var in = publicKeyResources.getInputStream()) {
+        if (StringUtils.hasText(publicKeyPem)) {
+            try (var in = new ByteArrayInputStream(privateKeyPem.getBytes(StandardCharsets.UTF_8))) {
+                return RsaKeyConverters.x509().convert(in);
+            }
+        }
+
+        try (var in = publicKeyResource.getInputStream()) {
             return RsaKeyConverters.x509().convert(in);
         }
     }
