@@ -53,7 +53,7 @@ public class JwtKeysConfig {
     @Bean
     public RSAPublicKey rsaPublicKey() throws IOException {
         if (StringUtils.hasText(publicKeyPem)) {
-            try (var in = new ByteArrayInputStream(privateKeyPem.getBytes(StandardCharsets.UTF_8))) {
+            try (var in = new ByteArrayInputStream(publicKeyPem.getBytes(StandardCharsets.UTF_8))) {
                 return RsaKeyConverters.x509().convert(in);
             }
         }
