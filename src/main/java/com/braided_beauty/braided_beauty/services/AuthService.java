@@ -31,7 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -45,6 +47,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final Set<String> ADMIN_BOOTSTRAP_EMAILS = Set.of("braidedbeautyco@outlook.com");
 
     public void login(LoginRequestDTO dto, HttpServletResponse res) {
         Authentication auth = authenticationManager.authenticate(
@@ -83,17 +86,24 @@ public class AuthService {
             throw new IllegalStateException("Email already in use.");
         }
 
+        String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ROOT);
+        boolean isBootstrapAdminEmail = ADMIN_BOOTSTRAP_EMAILS.contains(normalizedEmail);
+
         User newUser = new User();
-        newUser.setEmail(dto.getEmail());
+        newUser.setEmail(normalizedEmail);
         newUser.setName(dto.getName() != null ? dto.getName() : dto.getEmail());
         newUser.setPhoneNumber(PhoneNormalizer.toE164(dto.getPhoneNumber()).orElse(null));
-        newUser.setUserType(UserType.MEMBER);
+        newUser.setUserType(isBootstrapAdminEmail ? UserType.ADMIN : UserType.GUEST);
         newUser.setPassword(passwordEncoder.encode(dto.getPassword()));
 
         User saved = userRepository.save(newUser);
 
         loyaltyService.attachLoyaltyRecord(saved.getId());
         loyaltyService.awardSignUpBonus(saved.getId());
+
+        if (isBootstrapAdminEmail) {
+            log.warn("Bootstrap admin account created for email: {}", saved.getEmail());
+        }
 
         var authorities = UserType.roleStringsFor(saved.getUserType()).stream()
                 .map(r -> new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + r))
