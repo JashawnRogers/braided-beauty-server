@@ -39,7 +39,7 @@ public class OAuthHandlersConfig {
             addRefreshToken(res, issued.getRefreshToken());
 
             // Deliver accessToken back to frontend
-            res.sendRedirect("http://localhost:5173/auth/callback");
+            res.sendRedirect("https://braidedbeautyco.com/auth/callback");
         };
     }
 
