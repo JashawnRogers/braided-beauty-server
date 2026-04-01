@@ -13,7 +13,7 @@ public class CorsConfig {
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-        corsConfig.setAllowedOrigins(java.util.List.of("www.braidedbeautyco.com"));
+        corsConfig.setAllowedOrigins(java.util.List.of("www.braidedbeautyco.com", "https://braidedbeautyco.com", "braidedbeautyco.com"));
         corsConfig.setAllowedMethods(java.util.List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         corsConfig.setAllowedHeaders(java.util.List.of("Content-Type", "Authorization", "Stripe-Signature"));
         corsConfig.setExposedHeaders(List.of("Set-Cookie"));
