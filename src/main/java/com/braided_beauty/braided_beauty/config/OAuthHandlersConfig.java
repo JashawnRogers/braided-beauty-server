@@ -38,7 +38,7 @@ public class OAuthHandlersConfig {
             addRefreshToken(res, issued.getRefreshToken());
 
             // Deliver accessToken back to frontend
-            res.sendRedirect("https://www.braidedbeautyco.com/auth/callback");
+            res.sendRedirect("https://braidedbeautyco.com/auth/callback");
         };
     }
 

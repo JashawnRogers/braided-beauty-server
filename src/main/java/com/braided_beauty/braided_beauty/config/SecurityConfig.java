@@ -98,7 +98,7 @@ public class SecurityConfig {
                         .successHandler(oAuthHandlersConfig.oauth2SuccessHandler(oauthService, refreshTokenService))
                         .failureHandler((req, res, ex) -> {
                             ex.printStackTrace();
-                            res.sendRedirect("http://localhost:5173/login?oauth=failed");
+                            res.sendRedirect("https://braidedbeautyco.com/login?oauth=failed");
                         })
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

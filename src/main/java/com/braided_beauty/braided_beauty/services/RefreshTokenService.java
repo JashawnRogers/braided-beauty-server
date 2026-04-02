@@ -44,7 +44,7 @@ public class RefreshTokenService {
 
     public static final String COOKIE_NAME = "refreshToken";
     private static final Duration REFRESH_TTL = Duration.ofDays(14);
-    private static final Duration COOKIE_TTL = Duration.ofDays(14);
+    private static final Duration COOKIE_TTL = REFRESH_TTL;
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
 
     public RefreshTokenService(
