@@ -11,7 +11,6 @@ import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.repositories.RefreshTokenRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,22 +33,35 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-@AllArgsConstructor
 public class RefreshTokenService {
     private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final Clock clock;
-    @Value("${app.cookies.secure:false}")
-    private boolean secureCookie;
-    @Value("${app.cookies.same-site:Lax}")
-    private String sameSite;
+    private final boolean secureCookie;
+    private final String sameSite;
 
     public static final String COOKIE_NAME = "refreshToken";
     private static final Duration REFRESH_TTL = Duration.ofDays(14);
     private static final Duration COOKIE_TTL = Duration.ofDays(14);
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+
+    public RefreshTokenService(
+            RefreshTokenRepository refreshTokenRepository,
+            UserRepository userRepository,
+            JwtService jwtService,
+            Clock clock,
+            @Value("${app.cookies.secure:false}") boolean secureCookie,
+            @Value("${app.cookies.same-site:Lax}") String sameSite
+    ) {
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.userRepository = userRepository;
+        this.jwtService = jwtService;
+        this.clock = clock;
+        this.secureCookie = secureCookie;
+        this.sameSite = sameSite;
+    }
 
     @Transactional
     public IssuedRefreshTokenDTO issueForUser(UUID userId, String deviceInfo){
