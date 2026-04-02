@@ -7,6 +7,7 @@ import com.braided_beauty.braided_beauty.dtos.user.auth.UserRegistrationDTO;
 import com.braided_beauty.braided_beauty.dtos.user.global.ChangePasswordRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.exceptions.NotFoundException;
+import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.models.User;
 import com.braided_beauty.braided_beauty.records.AccessTokenResponse;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
@@ -50,17 +51,32 @@ public class AuthService {
     private static final Set<String> ADMIN_BOOTSTRAP_EMAILS = Set.of("braidedbeautyco@outlook.com");
 
     public void login(LoginRequestDTO dto, HttpServletResponse res) {
+        String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ROOT);
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new UnauthorizedException("Invalid email or password."));
+
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Account is disabled.");
+        }
+
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new UnauthorizedException("This account uses Google sign-in. Please continue with Google.");
+        }
+
         Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+                new UsernamePasswordAuthenticationToken(normalizedEmail, dto.getPassword())
         );
 
         AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
-        IssuedRefreshTokenDTO issued = refreshTokenService.issueForUser(principal.id(),"web");
+        IssuedRefreshTokenDTO issued = refreshTokenService.issueForUser(principal.id(), "web");
         refreshTokenService.addRefreshCookie(res, issued.getRefreshToken());
     }
 
     @Transactional
     public AccessTokenResponse refresh(String cookieToken, HttpServletResponse res) {
+        log.info("Refresh requested. Cookie present={}", cookieToken != null && !cookieToken.isBlank());
+
         if (cookieToken == null || cookieToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing refresh token");
         }
@@ -69,6 +85,7 @@ public class AuthService {
 
         // write the *new* refresh token cookie (rotation)
         refreshTokenService.addRefreshCookie(res, rotated.getNewRefreshToken());
+        log.info("Refresh succeeded. Rotated refresh token issued.");
 
         return new AccessTokenResponse(rotated.getNewAccessToken());
     }
@@ -128,6 +145,10 @@ public class AuthService {
     public void updatePassword(UUID id, ChangePasswordRequestDTO dto){
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found with provided ID: " + id));
+
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new UnauthorizedException("This account does not have a password. Use OAuth login or set a password first.");
+        }
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Current password is incorrect");

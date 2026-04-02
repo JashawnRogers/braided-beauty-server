@@ -12,6 +12,9 @@ import com.braided_beauty.braided_beauty.repositories.RefreshTokenRepository;
 import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,10 +36,15 @@ import java.util.UUID;
 @Service
 @AllArgsConstructor
 public class RefreshTokenService {
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final Clock clock;
+    @Value("${app.cookies.secure:false}")
+    private boolean secureCookie;
+    @Value("${app.cookies.same-site:Lax}")
+    private String sameSite;
 
     public static final String COOKIE_NAME = "refreshToken";
     private static final Duration REFRESH_TTL = Duration.ofDays(14);
@@ -70,9 +78,15 @@ public class RefreshTokenService {
 
     @Transactional
     public RotateTokensDTO rotate(String presentedToken) {
+        log.info("Refresh rotation started.");
         String hash = sha256(presentedToken); // Hash token to compare to DB
         RefreshToken currentToken = refreshTokenRepository.findByTokenHash(hash)
-                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token."));
+                .orElseThrow(() -> {
+                    log.warn("Refresh rotation failed. No refresh token row found.");
+                    return new UnauthorizedException("Invalid refresh token.");
+                });
+
+        log.info("Refresh token row found. tokenId={}, userId={}", currentToken.getTokenId(), currentToken.getUser().getId());
 
         Instant now = Instant.now(clock);
 
@@ -80,10 +94,14 @@ public class RefreshTokenService {
         boolean expired = now.isAfter(currentToken.getExpiresAt());
 
         if (reused){
+            log.warn("Refresh rotation failed. Token already revoked. tokenId={}, familyId={}",
+                    currentToken.getTokenId(), currentToken.getFamilyId());
             refreshTokenRepository.revokeFamily(currentToken.getFamilyId(), now);
             throw new UnauthorizedException("Refresh token reuse detected.");
         }
         if (expired) {
+            log.warn("Refresh rotation failed. Token expired. tokenId={}, expiresAt={}",
+                    currentToken.getTokenId(), currentToken.getExpiresAt());
             throw new UnauthorizedException("Refresh token expired.");
         }
 
@@ -108,17 +126,30 @@ public class RefreshTokenService {
         currentToken.setReplacedByTokenHash(newHash);
         refreshTokenRepository.save(currentToken);
 
-        // Create new access token for user
-        var auth = buildAuthForUser(currentToken.getUser().getId());
-        AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
+        String newAccessToken;
+        try {
+            // Create new access token for user
+            var auth = buildAuthForUser(currentToken.getUser().getId());
+            AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
+            log.info("Refresh auth rebuild succeeded. userId={}", principal.id());
 
-        String newAccessToken = jwtService.generateAccessToken(
-                principal.id(),
-                principal.email(),
-                principal.name(),
-                principal.authorities(),
-                principal.isEnabled()
-        );
+            newAccessToken = jwtService.generateAccessToken(
+                    principal.id(),
+                    principal.email(),
+                    principal.name(),
+                    principal.authorities(),
+                    principal.isEnabled()
+            );
+            log.info("Refresh JWT generation succeeded. userId={}", principal.id());
+        } catch (UnauthorizedException ex) {
+            log.warn("Refresh rotation failed during auth rebuild. userId={}, message={}",
+                    currentToken.getUser().getId(), ex.getMessage());
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error("Refresh rotation failed unexpectedly after token lookup. userId={}",
+                    currentToken.getUser().getId(), ex);
+            throw ex;
+        }
 
         return RotateTokensDTO.builder()
                 .newAccessToken(newAccessToken)
@@ -164,10 +195,19 @@ public class RefreshTokenService {
 
     private Authentication buildAuthForUser(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+                .orElseThrow(() -> {
+                    log.warn("Refresh auth rebuild failed. User not found. userId={}", userId);
+                    return new UnauthorizedException("Refresh token user no longer exists.");
+                });
 
         if (!user.isEnabled()) {
-            throw new org.springframework.security.authentication.DisabledException("User is disabled");
+            log.warn("Refresh auth rebuild failed. User disabled. userId={}", userId);
+            throw new UnauthorizedException("User account is disabled.");
+        }
+
+        if (user.getUserType() == null) {
+            log.warn("Refresh auth rebuild failed. User type missing. userId={}", userId);
+            throw new UnauthorizedException("User account is missing role information.");
         }
 
         Set<String> roleStrings = UserType.roleStringsFor(user.getUserType());
@@ -190,8 +230,8 @@ public class RefreshTokenService {
     public void addRefreshCookie(HttpServletResponse res, String token) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, token)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("None")
+                .secure(secureCookie)
+                .sameSite(sameSite)
                 .path("/")
                 .maxAge(COOKIE_TTL)
                 .build();
@@ -201,8 +241,8 @@ public class RefreshTokenService {
     public void clearRefreshCookie(HttpServletResponse res) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(true)
-                .sameSite("None")
+                .secure(secureCookie)
+                .sameSite(sameSite)
                 .path("/")
                 .maxAge(0)
                 .build();
