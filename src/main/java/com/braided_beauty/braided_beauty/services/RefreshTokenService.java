@@ -190,8 +190,8 @@ public class RefreshTokenService {
     public void addRefreshCookie(HttpServletResponse res, String token) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, token)
                 .httpOnly(true)
-                .secure(false)
-                .sameSite("Lax")
+                .secure(true)
+                .sameSite("None")
                 .path("/")
                 .maxAge(COOKIE_TTL)
                 .build();
@@ -201,7 +201,7 @@ public class RefreshTokenService {
     public void clearRefreshCookie(HttpServletResponse res) {
         ResponseCookie cookie = ResponseCookie.from(COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .sameSite("None")
                 .path("/")
                 .maxAge(0)
