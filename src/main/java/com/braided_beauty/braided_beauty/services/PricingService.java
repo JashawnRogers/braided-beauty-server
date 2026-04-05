@@ -34,7 +34,9 @@ public class PricingService {
     public PricingBreakdown calculate(Appointment appointment) {
         Objects.requireNonNull(appointment, "Appointment cannot be null");
 
-        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage()).orElse(BigDecimal.ZERO);
+        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage())
+                .orElse(BigDecimal.ZERO)
+                .divide(DIVISOR, 6,RoundingMode.HALF_UP);
 
         BigDecimal subtotal = money(computeSubtotal(appointment));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
@@ -104,7 +106,10 @@ public class PricingService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }
 
-        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage()).orElse(BigDecimal.ZERO);
+        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage())
+                .orElse(BigDecimal.ZERO)
+                .divide(DIVISOR, 6,RoundingMode.HALF_UP);
+
         BigDecimal subtotal = money(servicePrice.add(addOnsTotal));
         BigDecimal deposit = money(subtotal.multiply(DEPOSIT_RATE));
         BigDecimal postDepositBalance = money(subtotal.subtract(deposit));

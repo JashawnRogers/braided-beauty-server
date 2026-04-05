@@ -13,7 +13,6 @@ import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import com.braided_beauty.braided_beauty.repositories.ServiceRepository;
 import com.braided_beauty.braided_beauty.utils.PhoneNormalizer;
 import com.stripe.exception.StripeException;
-import com.stripe.model.Refund;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.RefundCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
@@ -44,11 +43,14 @@ public class PaymentService {
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
     private final BusinessSettingsService businessSettingsService;
-    private final PricingService pricingService;
     private final FrontendProps frontendProps;
+    private final StripeGateway stripeGateway;
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
+    /**
+     * Refunds the final payment for an appointment and marks the stored payment as refunded.
+     */
     @Transactional
     public void updateRefundPayment(Appointment appointment) throws StripeException {
         Payment payment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.FINAL)
@@ -62,7 +64,7 @@ public class PaymentService {
                 .setPaymentIntent(payment.getStripePaymentIntentId())
                 .build();
 
-        Refund.create(refundParams);
+        stripeGateway.createRefund(refundParams);
 
         payment.setPaymentStatus(PaymentStatus.REFUNDED);
         paymentRepository.save(payment);
@@ -70,7 +72,9 @@ public class PaymentService {
         log.info("Refund successful for appointment ID: {}", appointment.getId());
     }
 
-    // Session is created to be sent to webhook
+    /**
+     * Creates or reuses the Stripe Checkout session for an appointment deposit and persists the matching payment row.
+     */
     @Transactional
     public Session createDepositCheckoutSession(Appointment appointment, String successUrl, String cancelUrl) throws StripeException {
         Objects.requireNonNull(appointment, "appointment is required");
@@ -97,7 +101,7 @@ public class PaymentService {
 
             if (existing.getStripeSessionId() != null && existing.getPaymentStatus() == PaymentStatus.PENDING_PAYMENT) {
                 log.info("Reusing existing deposit checkout session {} for appointment {}", existing.getStripeSessionId(), appointment.getId());
-                return Session.retrieve(existing.getStripeSessionId());
+                return stripeGateway.retrieveCheckoutSession(existing.getStripeSessionId());
             }
         }
 
@@ -151,7 +155,7 @@ public class PaymentService {
                 )
                 .build();
 
-        Session session = Session.create(params);
+        Session session = stripeGateway.createCheckoutSession(params);
 
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
@@ -170,6 +174,9 @@ public class PaymentService {
         return session;
     }
 
+    /**
+     * Creates or reuses the Stripe Checkout session for the remaining balance, tip, and fees for an appointment.
+     */
     @Transactional
     public Session createFinalPaymentSession(
             Appointment appointment,
@@ -237,7 +244,7 @@ public class PaymentService {
 
                 log.info("Reusing existing final-payment checkout session {} for appointment {}",
                         existing.getStripeSessionId(), appointment.getId());
-                return Session.retrieve(existing.getStripeSessionId());
+                return stripeGateway.retrieveCheckoutSession(existing.getStripeSessionId());
             }
         }
 
@@ -354,7 +361,7 @@ public class PaymentService {
                 .setPaymentIntentData(paymentIntent.build())
                 .build();
 
-        Session session = Session.create(params);
+        Session session = stripeGateway.createCheckoutSession(params);
 
         Payment payment = Payment.builder()
                 .stripeSessionId(session.getId())
@@ -375,6 +382,9 @@ public class PaymentService {
         return session;
     }
 
+    /**
+     * Applies successful Checkout completion to payment and appointment state, then queues receipt email work after commit.
+     */
     @Transactional
     public void handleCheckoutSessionCompleted(Session session) {
         String paymentType = session.getMetadata().get("paymentType");
@@ -626,6 +636,9 @@ public class PaymentService {
         }
     }
 
+    /**
+     * Marks the appointment and payment as failed when Stripe reports an unsuccessful Checkout session.
+     */
     @Transactional
     public void handleCheckoutSessionFailed(Session session) {
         String appointmentId = session.getMetadata().get("appointmentId");
