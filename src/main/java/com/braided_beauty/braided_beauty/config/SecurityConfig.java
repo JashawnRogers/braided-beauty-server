@@ -3,9 +3,9 @@ package com.braided_beauty.braided_beauty.config;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.*;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -24,17 +24,26 @@ import java.util.UUID;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
-@AllArgsConstructor
 public class SecurityConfig {
 
     private final JwtDecoder jwtDecoder;
     private final OAuthUserService oauthService;
     private final RefreshTokenService refreshTokenService;
     private final OAuthHandlersConfig oAuthHandlersConfig;
+    private final String frontendBaseUrl;
 
-    // Secured matchers include: "/oauth2/**", "/login/oauth2/**", "/api/v1/login/**", "/api/v1/auth/**"
-    // Start the login by hitting: http://localhost:8080/oauth2/authorization/google
-    // Note: the OAuth2 callback that Spring handles is under "/login/oauth2/**".
+    public SecurityConfig(JwtDecoder jwtDecoder,
+                          OAuthUserService oauthService,
+                          RefreshTokenService refreshTokenService,
+                          OAuthHandlersConfig oAuthHandlersConfig,
+                          @Value("${app.frontend.base-url}") String frontendBaseUrl) {
+        this.jwtDecoder = jwtDecoder;
+        this.oauthService = oauthService;
+        this.refreshTokenService = refreshTokenService;
+        this.oAuthHandlersConfig = oAuthHandlersConfig;
+        this.frontendBaseUrl = frontendBaseUrl;
+    }
+
 
     @Bean
     public Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
@@ -52,7 +61,7 @@ public class SecurityConfig {
             String email = jwt.getClaimAsString("email");
 
             Boolean enabledClaim = jwt.getClaimAsBoolean("enabled");
-            boolean enabled = enabledClaim == null ? true : enabledClaim;
+            boolean enabled = (enabledClaim == null) ? true : enabledClaim;
             AppUserPrincipal principal = new AppUserPrincipal(userId, email, name, authorities, null, enabled);
 
             // Wrap in Authentication Object
@@ -98,7 +107,7 @@ public class SecurityConfig {
                         .successHandler(oAuthHandlersConfig.oauth2SuccessHandler(oauthService, refreshTokenService))
                         .failureHandler((req, res, ex) -> {
                             ex.printStackTrace();
-                            res.sendRedirect("https://braidedbeautyco.com/login?oauth=failed");
+                            res.sendRedirect("https://" + frontendBaseUrl +"/login?oauth=failed");
                         })
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
