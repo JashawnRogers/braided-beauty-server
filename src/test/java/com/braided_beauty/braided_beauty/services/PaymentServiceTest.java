@@ -44,7 +44,6 @@ class PaymentServiceTest {
     @Mock private EmailTemplateService emailTemplateService;
     @Mock private EmailService emailService;
     @Mock private BusinessSettingsService businessSettingsService;
-    @Mock private PricingService pricingService;
     @Mock private StripeGateway stripeGateway;
 
     private PaymentService paymentService;
@@ -60,7 +59,6 @@ class PaymentServiceTest {
                 emailTemplateService,
                 emailService,
                 businessSettingsService,
-                pricingService,
                 new FrontendProps("https://frontend.example"),
                 stripeGateway
         );
