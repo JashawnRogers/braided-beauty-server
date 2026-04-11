@@ -8,7 +8,9 @@ import com.braided_beauty.braided_beauty.dtos.user.member.UserDashboardDTO;
 import com.braided_beauty.braided_beauty.exceptions.UnauthorizedException;
 import com.braided_beauty.braided_beauty.records.AppUserPrincipal;
 import com.braided_beauty.braided_beauty.services.UserService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/user")
 @AllArgsConstructor
+@Tag(name = "User", description = "Authenticated user profile, dashboard, and history")
 public class UserController {
     private final UserService userService;
 
@@ -49,6 +52,7 @@ public class UserController {
     }
 
     @GetMapping("/dashboard/me")
+    @Operation(summary = "Return the authenticated user's dashboard summary")
     public ResponseEntity<UserDashboardDTO> getMyDashboard(
             @AuthenticationPrincipal AppUserPrincipal principal
     ) {

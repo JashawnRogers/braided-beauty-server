@@ -37,6 +37,9 @@ public class AppointmentConfirmationService {
     private final JwtService jwtService;
     private final JwtDecoder jwtDecoder;
 
+    /**
+     * Ensures the appointment has a current confirmation token for confirmation and ICS download links.
+     */
     @Transactional
     public BookingConfirmationToken ensureConfirmationTokenForAppointment(UUID appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
@@ -161,6 +164,9 @@ public class AppointmentConfirmationService {
         );
     }
 
+    /**
+     * Builds an ICS payload only after the booking confirmation token has been validated.
+     */
     @Transactional
     public String buildIcs(UUID appointmentId, String token) {
         BookingConfirmationDTO dto = getConfirmationByToken(appointmentId, token);
@@ -203,6 +209,9 @@ public class AppointmentConfirmationService {
                 );
     }
 
+    /**
+     * Builds an ICS payload for a confirmed appointment that was reached through Stripe checkout success.
+     */
     @Transactional
     public String buildIcs(String sessionId) {
         Appointment appointment = appointmentRepository.findByStripeSessionId(sessionId)

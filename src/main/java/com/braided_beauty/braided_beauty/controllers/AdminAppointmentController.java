@@ -5,6 +5,8 @@ import com.braided_beauty.braided_beauty.dtos.appointment.AdminAppointmentSummar
 import com.braided_beauty.braided_beauty.records.CheckoutLinkResponse;
 import com.braided_beauty.braided_beauty.services.AdminAppointmentService;
 import com.stripe.exception.StripeException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +23,13 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/appointment")
 @RequiredArgsConstructor
+@Tag(name = "Admin Appointments", description = "Admin appointment management and closeout flows")
 public class AdminAppointmentController {
     private final AdminAppointmentService adminAppointmentService;
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/closeout-cash")
+    @Operation(summary = "Mark an appointment as closed out with cash payment")
     public ResponseEntity<AdminAppointmentSummaryDTO> adminCompleteAppointmentCash(@RequestBody @Valid AdminAppointmentRequestDTO dto) {
         log.info("DTO appointmentId={}", dto.getAppointmentId());
         return ResponseEntity.ok(adminAppointmentService.adminCompleteAppointmentCash(dto));
@@ -33,6 +37,7 @@ public class AdminAppointmentController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/closeout-stripe")
+    @Operation(summary = "Create a Stripe Checkout link for an appointment's final payment")
     public ResponseEntity<CheckoutLinkResponse> adminCompleteAppointmentStripe(@RequestBody AdminAppointmentRequestDTO dto) throws StripeException {
         return ResponseEntity.ok(adminAppointmentService.adminCreateFinalPaymentViaDebitCard(dto.getAppointmentId(), dto.getTipAmount()));
     }

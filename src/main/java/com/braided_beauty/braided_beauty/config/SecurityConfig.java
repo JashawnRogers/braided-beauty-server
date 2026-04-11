@@ -80,6 +80,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // OAuth entry
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/bootstrap/admin").authenticated()
                         // Public API
                         .requestMatchers(

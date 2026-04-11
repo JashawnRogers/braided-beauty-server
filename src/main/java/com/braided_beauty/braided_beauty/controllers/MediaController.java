@@ -5,6 +5,8 @@ import com.braided_beauty.braided_beauty.dtos.presign.PresignUploadRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadRequestDTO;
 import com.braided_beauty.braided_beauty.dtos.upload.FinalizeUploadResponseDTO;
 import com.braided_beauty.braided_beauty.services.MediaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,15 +17,18 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/media")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin Media", description = "Admin-only media upload and asset management")
 public class MediaController {
     private final MediaService mediaService;
 
     @PostMapping("/presign-put")
+    @Operation(summary = "Create a presigned upload target for an admin media asset")
     public ResponseEntity<PresignPutResponseDTO> presign(@Valid @RequestBody PresignUploadRequestDTO req) {
         return ResponseEntity.ok(mediaService.presignPut(req));
     }
 
     @PostMapping("/finalize")
+    @Operation(summary = "Validate uploaded media and persist the finalized asset metadata")
     public ResponseEntity<FinalizeUploadResponseDTO> finalize(@Valid @RequestBody FinalizeUploadRequestDTO dto) {
         return ResponseEntity.ok(mediaService.verifyAndFinalize(dto));
     }

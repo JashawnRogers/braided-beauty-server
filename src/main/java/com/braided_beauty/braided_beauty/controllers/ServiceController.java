@@ -2,7 +2,7 @@ package com.braided_beauty.braided_beauty.controllers;
 
 import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.services.ServicesService;
-import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +13,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/service")
 @AllArgsConstructor
+@Tag(name = "Catalog", description = "Public service and category catalog endpoints")
 public class ServiceController {
     private final ServicesService service;
 

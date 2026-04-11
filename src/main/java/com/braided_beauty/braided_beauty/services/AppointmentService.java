@@ -70,6 +70,9 @@ public class AppointmentService {
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
 
+    /**
+     * Creates the appointment, validates scheduling constraints, and starts deposit collection when required.
+     */
     @Transactional
     public AppointmentCreateResponseDTO createAppointment(
             AppointmentRequestDTO dto,
@@ -204,6 +207,7 @@ public class AppointmentService {
 
         applyCancellation(appointment, reason);
 
+        // Guest cancellation links are single-use once the appointment has been canceled.
         appointment.setGuestCancelToken(null);
         appointment.setGuestTokenExpiresAt(null);
 

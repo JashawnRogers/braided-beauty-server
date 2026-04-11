@@ -43,14 +43,18 @@ public class PasswordResetService {
         this.frontendUrl = frontendUrl;
     }
 
+    /**
+     * Creates a single active reset token for the user and emails the frontend reset link.
+     */
     @Transactional
     public void requestPasswordReset(ForgotPasswordRequest dto) {
         User user = userRepository.findUserByEmail(dto.email())
                 .orElse(null);
 
-       if (user == null) {
-           return;
-       }
+        // Missing users are ignored to avoid disclosing which emails exist.
+        if (user == null) {
+            return;
+        }
 
         passwordResetTokenRepository.invalidateUnusedTokensForUser(user.getId());
 
@@ -81,6 +85,9 @@ public class PasswordResetService {
 
     }
 
+    /**
+     * Consumes a valid reset token and replaces the stored password hash.
+     */
     @Transactional
     public void resetPassword(String rawToken, String newPassword, String confirmPassword) {
         if (!newPassword.equals(confirmPassword)) {

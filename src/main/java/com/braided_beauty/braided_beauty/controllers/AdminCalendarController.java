@@ -3,6 +3,8 @@ package com.braided_beauty.braided_beauty.controllers;
 import com.braided_beauty.braided_beauty.dtos.calendar.*;
 import com.braided_beauty.braided_beauty.services.AdminAppointmentService;
 import com.braided_beauty.braided_beauty.services.ScheduleCalendarService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/calendars")
 @RequiredArgsConstructor
+@Tag(name = "Admin Calendars", description = "Admin schedule calendars, overrides, and event views")
 public class AdminCalendarController {
     private final ScheduleCalendarService scheduleCalendarService;
     private final AdminAppointmentService adminAppointmentService;
@@ -58,6 +61,7 @@ public class AdminCalendarController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/hours")
+    @Operation(summary = "Replace the weekly hours definition for a schedule calendar")
     public ResponseEntity<Void> upsertHours(
             @PathVariable UUID id,
             @RequestBody List<@Valid AdminCalendarHoursUpsertDTO> hours
@@ -84,6 +88,7 @@ public class AdminCalendarController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/overrides")
+    @Operation(summary = "Upsert calendar date overrides for the specified schedule")
     public ResponseEntity<List<AdminCalendarOverrideDTO>> upsertOverrides(
             @PathVariable UUID id,
             @RequestBody List<@Valid AdminCalendarOverrideUpsertDTO> overrides
@@ -103,6 +108,7 @@ public class AdminCalendarController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/events")
+    @Operation(summary = "List calendar events derived from appointments within a date-time range")
     public ResponseEntity<List<AdminCalendarEventDTO>> getCalendarEvents(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end

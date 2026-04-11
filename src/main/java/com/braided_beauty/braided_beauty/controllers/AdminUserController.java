@@ -5,7 +5,9 @@ import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberProfileRespo
 import com.braided_beauty.braided_beauty.dtos.user.member.UserMemberRequestDTO;
 import com.braided_beauty.braided_beauty.enums.UserType;
 import com.braided_beauty.braided_beauty.services.UserService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @RequiredArgsConstructor
+@Tag(name = "Admin Users", description = "Admin member lookup, profile maintenance, and role changes")
 public class AdminUserController {
     private final UserService userService;
 
@@ -56,6 +59,7 @@ public class AdminUserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles/{userId}")
+    @Operation(summary = "Update a user's role")
     public ResponseEntity<UserSummaryResponseDTO> updateUserRole(
             @Parameter(description = "UUID of the user", required = true)
             @PathVariable UUID userId,
