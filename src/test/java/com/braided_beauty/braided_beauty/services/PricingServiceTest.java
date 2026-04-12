@@ -58,7 +58,7 @@ class PricingServiceTest {
         );
 
         BusinessSettings settings = new BusinessSettings();
-        settings.setDiscountPercentage(new BigDecimal("0.25"));
+        settings.setDiscountPercentage(new BigDecimal("25"));
         when(businessSettingsService.getOrCreate()).thenReturn(settings);
     }
 

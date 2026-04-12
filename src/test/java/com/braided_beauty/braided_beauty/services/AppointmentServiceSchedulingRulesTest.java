@@ -47,7 +47,6 @@ class AppointmentServiceSchedulingRulesTest {
     @Mock private PromoCodeValidationService promoCodeValidationService;
     @Mock private ScheduleCalendarService scheduleCalendarService;
     @Mock private ScheduleCalendarRepository scheduleCalendarRepository;
-    @Mock private FrontendProps frontendProps;
 
     @InjectMocks
     private AppointmentService appointmentService;
@@ -58,6 +57,7 @@ class AppointmentServiceSchedulingRulesTest {
     private LocalDateTime appointmentStart;
     private AppointmentRequestDTO request;
     private Appointment mappedAppointment;
+    private FrontendProps frontendProps = new FrontendProps("http://localhost:8080");
 
     @BeforeEach
     void setUp() {
