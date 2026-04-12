@@ -68,6 +68,7 @@ public class AdminAppointmentService {
         appointment.setUpdatedAt(LocalDateTime.now());
 
         appointmentRepository.save(appointment);
+        log.info("Admin canceled appointment. appointmentId={}", appointment.getId());
         return appointmentDtoMapper.toAdminSummaryDTO(appointment);
     }
 
@@ -142,12 +143,12 @@ public class AdminAppointmentService {
         appointment.setCompletedAt(LocalDateTime.now());
 
         appointmentRepository.save(appointment);
+        log.info("Admin completed appointment with cash. appointmentId={}", appointment.getId());
         return appointmentDtoMapper.toAdminSummaryDTO(appointment);
     }
 
     @Transactional
     public AdminAppointmentSummaryDTO adminUpdateAppointment(UUID id, AdminAppointmentRequestDTO dto) throws BadRequestException {
-        log.info("Request DTO: {}", dto);
         if (dto.getAppointmentId() == null || !dto.getAppointmentId().equals(id)) {
             throw new BadRequestException("Path id and body appointmentId must match");
         }
@@ -238,6 +239,7 @@ public class AdminAppointmentService {
         appointment.setFeeTotal(appointment.computeTotalFeeAmount());
 
         Appointment saved = appointmentRepository.saveAndFlush(appointment);
+        log.info("Admin updated appointment. appointmentId={}", saved.getId());
 
         List<UUID> feeIds = dto.getFeeIds() != null ? dto.getFeeIds() : deriveFeeIds(saved);
 
@@ -253,6 +255,7 @@ public class AdminAppointmentService {
         String cancelUrl = frontendProps.baseUrl() + "/book/cancel?appointmentId=" + appointment.getId();
 
         Session session = paymentService.createFinalPaymentSession(appointment, successUrl, cancelUrl, tipAmount);
+        log.info("Admin created final payment checkout session. appointmentId={}", appointment.getId());
 
         return new CheckoutLinkResponse(session.getUrl(), appointment.getId());
     }

@@ -57,10 +57,12 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedException("Invalid email or password."));
 
         if (!user.isEnabled()) {
+            log.warn("Login rejected for disabled account. userId={}", user.getId());
             throw new UnauthorizedException("Account is disabled.");
         }
 
         if (user.getPassword() == null || user.getPassword().isBlank()) {
+            log.warn("Password login rejected for OAuth-only account. userId={}", user.getId());
             throw new UnauthorizedException("This account uses Google sign-in. Please continue with Google.");
         }
 
@@ -71,6 +73,7 @@ public class AuthService {
         AppUserPrincipal principal = (AppUserPrincipal) auth.getPrincipal();
         IssuedRefreshTokenDTO issued = refreshTokenService.issueForUser(principal.id(), "web");
         refreshTokenService.addRefreshCookie(res, issued.getRefreshToken());
+        log.info("Login succeeded. userId={}", principal.id());
     }
 
     @Transactional
@@ -95,6 +98,7 @@ public class AuthService {
             refreshTokenService.revoke(cookieToken);
         }
         refreshTokenService.clearRefreshCookie(res);
+        log.info("Logout completed. Cookie present={}", cookieToken != null && !cookieToken.isBlank());
     }
 
     @Transactional
@@ -114,12 +118,13 @@ public class AuthService {
         newUser.setPassword(passwordEncoder.encode(dto.getPassword()));
 
         User saved = userRepository.save(newUser);
+        log.info("User registered. userId={} role={}", saved.getId(), saved.getUserType());
 
         loyaltyService.attachLoyaltyRecord(saved.getId());
         loyaltyService.awardSignUpBonus(saved.getId());
 
         if (isBootstrapAdminEmail) {
-            log.warn("Bootstrap admin account created for email: {}", saved.getEmail());
+            log.warn("Bootstrap admin account created during registration. userId={}", saved.getId());
         }
 
         var authorities = UserType.roleStringsFor(saved.getUserType()).stream()
@@ -166,6 +171,7 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userRepository.save(user);
+        log.info("Password updated. userId={}", user.getId());
     }
 
 

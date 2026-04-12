@@ -14,6 +14,8 @@ import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
 import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -31,6 +33,7 @@ import java.util.UUID;
 @Service
 @AllArgsConstructor
 public class AppointmentConfirmationService {
+    private static final Logger log = LoggerFactory.getLogger(AppointmentConfirmationService.class);
     private final AppointmentRepository appointmentRepository;
     private final PaymentRepository paymentRepository;
     private final AddOnDTOMapper addOnDTOMapper;
@@ -49,6 +52,7 @@ public class AppointmentConfirmationService {
                 && appointment.getBookingConfirmationExpiresAt() != null &&
                 Instant.now().isBefore(appointment.getBookingConfirmationExpiresAt())
         ) {
+            log.info("Existing booking confirmation token still valid. appointmentId={}", appointmentId);
             return null;
         }
 
@@ -57,6 +61,7 @@ public class AppointmentConfirmationService {
         appointment.setBookingConfirmationExpiresAt(confirmationToken.expiresAt());
 
         appointmentRepository.save(appointment);
+        log.info("Booking confirmation token issued. appointmentId={}", appointmentId);
         return confirmationToken;
     }
 
@@ -68,6 +73,7 @@ public class AppointmentConfirmationService {
         if (!"booking_confirmation".equals(typ)
             || !appointmentId.toString().equals(decoded.getSubject())
         ) {
+            log.warn("Booking confirmation rejected due to invalid token metadata. appointmentId={}", appointmentId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid confirmation token");
         }
 
@@ -79,18 +85,23 @@ public class AppointmentConfirmationService {
 
         Instant expiresAt = decoded.getExpiresAt();
         if (expiresAt == null || Instant.now().isAfter(expiresAt)) {
+            log.warn("Booking confirmation rejected because the token expired. appointmentId={}", appointmentId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Confirmation link expired");
         }
 
         String tokenJti = decoded.getId();
         String entityJti = appointment.getBookingConfirmationJti();
         if (tokenJti == null || entityJti == null || !tokenJti.equals(entityJti)) {
+            log.warn("Booking confirmation rejected because the token was superseded. appointmentId={}", appointmentId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Confirmation link is no longer valid");
         }
 
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
+            log.warn("Booking confirmation rejected because payment failed. appointmentId={}", appointmentId);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed");
         }
+
+        log.info("Booking confirmation resolved. appointmentId={}", appointmentId);
 
         return new BookingConfirmationDTO(
                 appointment.getId(),
@@ -109,8 +120,11 @@ public class AppointmentConfirmationService {
                 .orElseThrow(() -> new NotFoundException("Appointment not found from session: " + sessionId));
 
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
+            log.warn("Session confirmation rejected because payment failed. appointmentId={}", appointment.getId());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
         }
+
+        log.info("Session confirmation resolved. appointmentId={}", appointment.getId());
 
         List<AddOnResponseDTO> addOns = appointment.getAddOns()
                 .stream()
@@ -140,8 +154,11 @@ public class AppointmentConfirmationService {
         Appointment appointment = finalPayment.getAppointment();
 
         if (appointment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) {
+            log.warn("Final payment confirmation rejected because payment failed. appointmentId={}", appointment.getId());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment failed.");
         }
+
+        log.info("Final payment confirmation resolved. appointmentId={}", appointment.getId());
 
         List<AddOnResponseDTO> addOns = appointment.getAddOns()
                 .stream()

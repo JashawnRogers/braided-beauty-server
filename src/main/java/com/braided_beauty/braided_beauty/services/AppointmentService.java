@@ -78,6 +78,7 @@ public class AppointmentService {
             AppointmentRequestDTO dto,
             AppUserPrincipal principal
     ) throws StripeException {
+        log.info("Creating appointment. serviceId={} principalPresent={}", dto.getServiceId(), principal != null);
 
         ServiceModel service = serviceRepository.findById(dto.getServiceId())
                 .orElseThrow(() -> new NotFoundException("Service not found"));
@@ -141,6 +142,8 @@ public class AppointmentService {
                         appointmentConfirmationService.ensureConfirmationTokenForAppointment(savedNoDepositRequired.getId());
 
                 sendNoDepositBookingEmailsAfterCommit(savedNoDepositRequired);
+                log.info("Appointment confirmed without deposit. appointmentId={} calendarId={}",
+                        savedNoDepositRequired.getId(), calendarId);
 
                 return new AppointmentCreateResponseDTO(
                         savedNoDepositRequired.getId(),
@@ -164,11 +167,15 @@ public class AppointmentService {
 
             saved.setStripeSessionId(session.getId());
             appointmentRepository.save(saved);
+            log.info("Appointment created with pending deposit checkout. appointmentId={} calendarId={}",
+                    saved.getId(), calendarId);
 
             return new AppointmentCreateResponseDTO(saved.getId(), true, session.getUrl(), null);
 
         } catch (DataIntegrityViolationException ex) {
             if (isUniqueViolation(ex)) {
+                log.warn("Appointment creation rejected by unique booking constraint. serviceId={} calendarId={} appointmentTime={}",
+                        dto.getServiceId(), calendarId, appointment.getAppointmentTime());
                 throw new ConflictException("That time was just booked. Please pick another time.");
             }
             throw ex;
@@ -188,6 +195,7 @@ public class AppointmentService {
         Appointment saved = appointmentRepository.save(appointment);
 
         sendCancellationEmailsAfterCommit(saved, false);
+        log.info("Member appointment canceled. appointmentId={} userId={}", saved.getId(), userId);
 
         return appointmentDtoMapper.toDTO(saved);
     }
@@ -214,6 +222,7 @@ public class AppointmentService {
         Appointment saved = appointmentRepository.save(appointment);
 
         sendCancellationEmailsAfterCommit(saved, true);
+        log.info("Guest appointment canceled. appointmentId={}", saved.getId());
 
         return appointmentDtoMapper.toDTO(saved);
     }
@@ -221,7 +230,6 @@ public class AppointmentService {
     public AppointmentResponseDTO getAppointmentById(UUID appointmentId){
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
-        log.info("Retrieved service with ID: {}", appointment.getId());
         return appointmentDtoMapper.toDTO(appointment);
     }
 
@@ -272,12 +280,15 @@ public class AppointmentService {
         LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
         List<Appointment> conflicts = appointmentRepository.findConflictingAppointments(start, end, bufferMinutes, calendarId);
         if (!conflicts.isEmpty()) {
+            log.warn("Appointment rejected due to scheduling conflict. calendarId={} appointmentTime={}", calendarId, start);
             throw new ConflictException("This time overlaps with another appointment.");
         }
     }
 
     private void assertWithinBookingWindow(ScheduleCalendar calendar, LocalDateTime appointmentTime) {
         if (!scheduleCalendarService.isWithinBookingWindow(calendar, appointmentTime)) {
+            log.warn("Appointment rejected outside booking window. calendarId={} appointmentTime={}",
+                    calendar.getId(), appointmentTime);
             throw new BadRequestException("The selected date is outside this calendar's booking window.");
         }
     }
@@ -288,6 +299,7 @@ public class AppointmentService {
                 scheduleCalendarService.getEffectiveCalendarConstraints(calendar, date);
 
         if (constraints.isClosed() || constraints.openAt() == null || constraints.closeAt() == null) {
+            log.warn("Appointment rejected because calendar is closed. calendarId={} date={}", calendar.getId(), date);
             throw new BadRequestException("This calendar is closed for the selected date.");
         }
 
@@ -295,6 +307,8 @@ public class AppointmentService {
         LocalDateTime end = start.plusMinutes(appointment.getDurationMinutes() + bufferMinutes);
 
         if (start.isBefore(constraints.openAt()) || end.isAfter(constraints.closeAt())) {
+            log.warn("Appointment rejected outside effective calendar hours. calendarId={} appointmentTime={}",
+                    calendar.getId(), start);
             throw new ConflictException("Appointment must fit within calendar hours including buffer.");
         }
     }
@@ -309,6 +323,8 @@ public class AppointmentService {
 
         long currentBookings = appointmentRepository.countBlockingBookingsForDay(dayStart, dayEnd, calendar.getId());
         if (currentBookings >= calendar.getMaxBookingsPerDay()) {
+            log.warn("Appointment rejected because daily booking cap was reached. calendarId={} date={} currentBookings={}",
+                    calendar.getId(), appointmentDate, currentBookings);
             throw new ConflictException("This calendar has reached its booking limit for that day.");
         }
     }
