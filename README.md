@@ -1,148 +1,214 @@
-# Braided Beauty - Backend API
+# Braided Beauty Backend
 
-This is the backend API for **Braided Beauty**, a full-stack hairstyling appointment booking platform. Built with **Java + Spring Boot**, the application supports user authentication (email/password & OAuth2), appointment scheduling with Stripe payment integration, loyalty tracking, role-based admin access, and more.
+Spring Boot backend for the Braided Beauty booking platform. This service manages authentication, appointment booking, pricing, scheduling, admin operations, Stripe checkout flows, media upload coordination, loyalty settings, and developer-facing API documentation.
 
----
+The codebase is structured as a deployed backend rather than a starter project: it uses PostgreSQL with Flyway migrations, JWT-based auth, Google OAuth login, Stripe webhooks, Redis-backed rate limiting, and AWS S3 integration for media workflows.
 
-## 🚀 Features
+## Overview
 
--  **Secure Auth**: Email/password login, Google OAuth2, JWT access/refresh token system with auto-rotation
--  **Role-Based Access**: Users can be `MEMBER` or `ADMIN` with protected endpoints via `@PreAuthorize`
-- **Appointment Booking**: Book services with Stripe deposit collection
-- **Stripe Integration**: Supports deposits, final payments, payment failure detection (via webhooks)
-- **Loyalty System**: Tracks appointment count & reward points for repeat clients
-- **Admin Dashboard**: View user analytics, assign roles, and manage services
-- **Swagger UI**: API documented and browsable at `/swagger-ui.html`
+The backend exposes a versioned REST API under `/api/v1`. Public endpoints support catalog browsing, pricing previews, availability lookup, booking, guest cancellation, booking confirmation, and Stripe webhooks. Authenticated member endpoints cover profile access, appointment history, password changes, and dashboard data. Admin endpoints handle services, categories, add-ons, business settings, calendars, promo codes, analytics, fees, appointments, and user management.
 
----
+## Main Features
 
-## 🧑‍💻 Tech Stack
+- Email/password authentication with JWT access tokens and refresh-token rotation
+- Google OAuth login using Spring Security OAuth2
+- Public booking flow with Stripe deposit checkout
+- Stripe webhook handling for deposit completion, final payment completion, and failed async payments
+- Guest booking lookup and cancellation by token
+- Member appointment history, dashboard, and profile management
+- Admin service, category, add-on, fee, promo code, and business-settings management
+- Schedule calendar management with weekly hours, date overrides, booking windows, and daily caps
+- Loyalty settings and analytics endpoints for admin workflows
+- Presigned S3 upload flow for service media
+- OpenAPI JSON and Swagger UI for developer documentation
 
-| Layer         | Technology                         |
-|---------------|-------------------------------------|
-| Language      | Java 21                             |
-| Framework     | Spring Boot                         |
-| Auth          | Spring Security + JWT + OAuth2.0    |
-| Database      | PostgreSQL                          |
-| ORM           | Spring Data JPA                     |
-| Payments      | Stripe API + Webhooks               |
-| Docs          | springdoc-openapi (Swagger)         |
+## Tech Stack
 
----
+- Java 21
+- Spring Boot 3.5
+- Spring Web
+- Spring Security
+- Spring Security OAuth2 Client / Resource Server
+- Spring Data JPA + Hibernate
+- PostgreSQL
+- Flyway
+- Stripe Java SDK
+- AWS SDK for S3
+- Thymeleaf for email templates
+- Bucket4j + Lettuce for Redis-backed rate limiting
+- springdoc-openapi for Swagger UI
+- JUnit 5 + Mockito + Spring Boot Test
 
-## 📂 Project Structure
+## Authentication Overview
 
-```
-braided-beauty-server/
-├── controllers/
-├── dtos/
-├── entities/
-├── enums/
-├── records/
-├── repositories/
-├── services/
-├── config/
-└── exceptions/
-```
+- Access is protected with Spring Security and method-level authorization.
+- Email/password login and registration are handled under `/api/v1/auth`.
+- Refresh tokens are stored in cookies and rotated through `/api/v1/auth/refresh`.
+- Google OAuth login is enabled through Spring Security OAuth2 client configuration.
+- Role checks are enforced with `@PreAuthorize`, primarily for admin endpoints.
+- Swagger/OpenAPI endpoints are publicly reachable at `/swagger-ui.html`, `/swagger-ui/index.html`, and `/v3/api-docs`.
 
----
+## Payments Overview
 
-## 🛠️ Getting Started
+- Booking requests can create a Stripe Checkout session for the required deposit.
+- If no deposit is required, the appointment is confirmed immediately.
+- Stripe webhooks are received at `/api/v1/webhook/stripe`.
+- Admin workflows also support final-payment closeout by cash or Stripe Checkout.
+- Pricing logic separates subtotal, deposit, remaining balance, promo discount, and tip calculations.
+
+## Scheduling Overview
+
+- Services are associated with schedule calendars.
+- Availability is calculated from calendar rules, business-hour constraints, add-on duration, booking windows, and daily caps.
+- Appointments are checked for conflicts before being saved.
+- Admin calendar endpoints support:
+  - calendar creation and updates
+  - weekly hours upserts
+  - date override upserts
+  - calendar event views derived from appointments
+
+## API Documentation
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Alternate Swagger UI path: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Practical endpoint reference: [docs/API.md](docs/API.md)
+
+## Local Setup
 
 ### Prerequisites
 
-- Java 21+
-- Maven
+- Java 21
 - PostgreSQL
-- Stripe CLI (for local webhook testing)
+- Maven Wrapper (`./mvnw` is included)
+- Redis if you want local rate limiting enabled
 
-### Environment Setup
+### 1. Configure environment variables
 
-1. Clone the repo:
+This project reads most sensitive values from environment variables. The main names are listed in the Environment Variables section below.
 
-```bash
-git clone https://github.com/JashawnRogers/braided-beauty-server.git
-cd braided-beauty-server
-```
+### 2. Start required local services
 
-2. Configure environment variables (e.g. `application.properties`):
+Minimum verified local dependencies for the default `local` profile:
 
-```properties
-# Database
-spring.datasource.url=jdbc:postgresql://localhost:5432/braided_beauty
-spring.datasource.username=your_user
-spring.datasource.password=your_password
+- PostgreSQL
+- Redis
 
-# Stripe
-stripe.api.key=sk_test_...
-stripe.webhook.secret=whsec_...
+If you do not want to run Redis locally for development, set `app.rate-limiting.enabled=false` in a local override or equivalent environment-backed config before starting the app.
 
-# OAuth2
-spring.security.oauth2.client.registration.google.client-id=your_client_id
-spring.security.oauth2.client.registration.google.client-secret=your_client_secret
-```
+### 3. Run the application
 
-3. Run the app:
+From the project root:
 
 ```bash
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
----
+The `local` profile config in `src/main/resources/application-local.properties` points to:
 
-## 🔐 Authentication Flow
+- PostgreSQL at `jdbc:postgresql://localhost:5432/braided_beauty`
+- Redis at `redis://localhost:6379`
+- frontend base URL at `http://localhost:5173`
 
-- **Email/Password** login returns a JWT and sets a refresh token as an HttpOnly cookie.
-- **OAuth2 (Google)** login follows Spring Security’s redirect flow and sets the same tokens.
-- Tokens are automatically refreshed via `/api/v1/auth/refresh` when access expires.
+### 4. Database migrations
 
----
+Flyway is enabled by default and runs on startup.
 
-## 🔄 Stripe Flow
+## Environment Variables
 
-- `/api/v1/appointments/book` initiates a Stripe checkout session
-- Webhooks are handled at `/api/v1/webhook/stripe`
-  - `checkout.session.completed` → Updates appointment & records payment
-  - `payment_intent.payment_failed` → Updates appointment status
+Names only, based on the checked-in configuration:
 
----
+### Database
 
-## 🧪 API Documentation
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
 
-Swagger is enabled at:
+### OAuth
 
+- `OAUTH_GOOGLE_CLIENT_ID`
+- `OAUTH_GOOGLE_CLIENT_SECRET`
+
+### AWS S3
+
+- `AWS_S3_ACCESS_KEY`
+- `AWS_S3_SECRET_KEY`
+- `AWS_S3_REGION`
+- `AWS_S3_BUCKET_NAME`
+- `AWS_S3_URL`
+
+### Mail
+
+- `SPRING_MAIL_HOST`
+- `SPRING_MAIL_PORT`
+- `SPRING_MAIL_USERNAME`
+- `SPRING_MAIL_PASSWORD`
+
+### Frontend / Cookies
+
+- `APP_COOKIES_SECURE`
+- `APP_COOKIES_SAME_SITE`
+
+### Bootstrap Admin
+
+- `APP_BOOTSTRAP_ADMIN_ENABLED`
+- `APP_BOOTSTRAP_ADMIN_SECRET`
+
+### Stripe
+
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_TEST_SECRET_KEY`
+
+### JWT
+
+- `JWT_PRIVATE_KEY_PEM`
+- `JWT_PUBLIC_KEY_PEM`
+
+## Running Tests
+
+Run the full suite:
+
+```bash
+./mvnw test
 ```
-http://localhost:8080/swagger-ui.html
+
+Run a single test class:
+
+```bash
+./mvnw -Dtest=BraidedBeautyApplicationTests test
 ```
 
-All endpoints are annotated with OpenAPI for full schema visibility.
+Run a single test method:
 
----
+```bash
+./mvnw -Dtest=BraidedBeautyApplicationTests#contextLoads test
+```
 
-## 🧼 Global Error Handling
+Compile without running tests:
 
-Custom exceptions like `NotFoundException` and `DuplicateEntityException` are handled globally via `@RestControllerAdvice`.
+```bash
+./mvnw -DskipTests compile
+```
 
----
+Test notes:
 
-## 🏗️ Roadmap
+- The current test setup uses test overrides so Redis, S3, mail, and external auth values do not need to be real for the suite to pass.
+- The full Spring context test still expects a local PostgreSQL database matching the configured local profile.
 
-- [ ] Unit and integration tests with Mockito & Testcontainers
-- [ ] Frontend dashboard in React
-- [ ] Email/SMS notifications for appointments
-- [ ] Admin analytics charts with visual breakdowns
-- [ ] File uploads for service images/videos using S3 or Firebase
+## Deployment Overview
 
----
+At a high level, the backend is designed to run as a Spring Boot service with:
 
-## 👤 Author
+- PostgreSQL as the primary datastore
+- Flyway-managed schema migrations
+- environment-driven secrets and integration settings
+- Stripe webhook support
+- optional Google OAuth login
+- AWS S3-backed media storage
+- Redis-backed request rate limiting in non-test environments
 
-**Jashawn Rogers**  
-[GitHub](https://github.com/JashawnRogers)  
-[LinkedIn](https://linkedin.com/in/jashawncodes)
+The repository does not include infrastructure manifests in the root, so deployment-specific steps should be taken from your actual hosting environment and secret manager.
 
----
+## Known Limitations and Follow-Up Areas
 
-## 📝 License
-
-This project is licensed under the MIT License.
+- Local runtime currently assumes supporting services are available unless specific features are disabled through configuration.
+- The repository includes production-oriented integrations in the main application context, so local bootstrapping depends on configuration completeness.
