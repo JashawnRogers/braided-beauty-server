@@ -24,7 +24,7 @@ public class ServiceCreateDTO {
     @Size(min = 1, max = 150)
     private String name;
 
-    @Size(max = 500)
+    @Size(max = 5000, message = "Description must be no more than 5000 characters.")
     private String description;
 
     @DecimalMin(value = "0.00", message = "Price amount must not be a negative number.")

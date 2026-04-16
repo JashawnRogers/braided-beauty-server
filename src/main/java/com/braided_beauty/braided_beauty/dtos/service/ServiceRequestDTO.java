@@ -31,7 +31,7 @@ public class ServiceRequestDTO {
     private ServiceCategory category;
     @Size(min = 1, max = 150, message = "Name must be at least 1 character and more than 150.")
     private String name;
-    @Size(max = 500, message = "Description must be no more than 500 characters.")
+    @Size(max = 5000, message = "Description must be no more than 5000 characters.")
     private String Description;
     @DecimalMin(value = "0.00", message = "Price must not be a negative number.")
     private BigDecimal price;

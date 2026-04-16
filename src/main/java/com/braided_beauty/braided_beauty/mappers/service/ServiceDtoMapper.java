@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.braided_beauty.braided_beauty.utils.Deposit.getDepositAmount;
 
@@ -33,13 +34,28 @@ public class ServiceDtoMapper {
                 .toList();
     }
 
+    private static String normalizeDescription(@Nullable String src) {
+        if (src == null) return null;
+
+        String normalized = src
+                .replace("\r\n", "\n")
+                .replace('\r', '\n');
+
+        normalized = normalized.lines()
+                .map(String::stripTrailing)
+                .collect(Collectors.joining("\n"))
+                .strip();
+
+        return normalized.isEmpty() ? null : normalized;
+    }
+
 
     public ServiceModel create(ServiceCreateDTO dto){
         ServiceModel service = new ServiceModel();
 
         if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName().trim());
 
-        if (dto.getDescription() != null) service.setDescription(dto.getDescription());
+        if (dto.getDescription() != null) service.setDescription(normalizeDescription(dto.getDescription()));
 
         if (dto.getPrice() != null) {
             BigDecimal price = dto.getPrice().setScale(2, RoundingMode.UNNECESSARY);
@@ -79,7 +95,7 @@ public class ServiceDtoMapper {
     public void updateDto(ServiceRequestDTO dto, ServiceModel service) {
         if (dto.getName() != null && !dto.getName().isBlank()) service.setName(dto.getName().trim());
         if (dto.getCategory() != null) service.setCategory(dto.getCategory());
-        if (dto.getDescription() != null) service.setDescription(dto.getDescription().trim());
+        if (dto.getDescription() != null) service.setDescription(normalizeDescription(dto.getDescription()));
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
 
