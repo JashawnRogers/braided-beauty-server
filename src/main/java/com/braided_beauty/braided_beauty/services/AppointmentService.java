@@ -21,7 +21,6 @@ import com.braided_beauty.braided_beauty.repositories.UserRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
 import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +52,6 @@ import java.util.*;
  */
 
 @Service
-@AllArgsConstructor
 public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final AppointmentDtoMapper appointmentDtoMapper;
@@ -71,8 +69,43 @@ public class AppointmentService {
     private final ScheduleCalendarRepository scheduleCalendarRepository;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
-    @Qualifier("applicationTaskExecutor")
     private final TaskExecutor taskExecutor;
+
+    public AppointmentService(
+            AppointmentRepository appointmentRepository,
+            AppointmentDtoMapper appointmentDtoMapper,
+            UserRepository userRepository,
+            ServiceRepository serviceRepository,
+            AddOnService addOnService,
+            PaymentService paymentService,
+            AppointmentConfirmationService appointmentConfirmationService,
+            BusinessSettingsService businessSettingsService,
+            EmailService emailService,
+            EmailTemplateService emailTemplateService,
+            PricingService pricingService,
+            PromoCodeValidationService promoCodeValidationService,
+            ScheduleCalendarService scheduleCalendarService,
+            ScheduleCalendarRepository scheduleCalendarRepository,
+            FrontendProps frontendProps,
+            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.appointmentDtoMapper = appointmentDtoMapper;
+        this.userRepository = userRepository;
+        this.serviceRepository = serviceRepository;
+        this.addOnService = addOnService;
+        this.paymentService = paymentService;
+        this.appointmentConfirmationService = appointmentConfirmationService;
+        this.businessSettingsService = businessSettingsService;
+        this.emailService = emailService;
+        this.emailTemplateService = emailTemplateService;
+        this.pricingService = pricingService;
+        this.promoCodeValidationService = promoCodeValidationService;
+        this.scheduleCalendarService = scheduleCalendarService;
+        this.scheduleCalendarRepository = scheduleCalendarRepository;
+        this.frontendProps = frontendProps;
+        this.taskExecutor = taskExecutor;
+    }
 
     /**
      * Creates the appointment, validates scheduling constraints, and starts deposit collection when required.
