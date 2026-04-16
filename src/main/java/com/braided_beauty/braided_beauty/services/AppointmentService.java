@@ -25,9 +25,11 @@ import lombok.AllArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -69,6 +71,8 @@ public class AppointmentService {
     private final ScheduleCalendarRepository scheduleCalendarRepository;
     private final static Logger log = LoggerFactory.getLogger(AppointmentService.class);
     private final FrontendProps frontendProps;
+    @Qualifier("applicationTaskExecutor")
+    private final TaskExecutor taskExecutor;
 
     /**
      * Creates the appointment, validates scheduling constraints, and starts deposit collection when required.
@@ -389,11 +393,11 @@ public class AppointmentService {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() {
-                    work.run();
+                    taskExecutor.execute(work);
                 }
             });
         } else {
-            work.run();
+            taskExecutor.execute(work);
         }
     }
 
