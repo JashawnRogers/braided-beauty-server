@@ -1,5 +1,6 @@
 package com.braided_beauty.braided_beauty.exceptions;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,8 +119,8 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleUnexpected(Exception ex){
-        log.error("Unexpected error", ex);
+    public ResponseEntity<?> handleUnexpected(Exception ex, HttpServletRequest request){
+        log.error("Unexpected error on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Something went wrong. Please try again later.");
     }

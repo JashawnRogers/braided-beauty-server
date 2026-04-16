@@ -34,7 +34,7 @@ public class PricingService {
     public PricingBreakdown calculate(Appointment appointment) {
         Objects.requireNonNull(appointment, "Appointment cannot be null");
 
-        BigDecimal DEPOSIT_RATE = Optional.of(businessSettingsService.getOrCreate().getDiscountPercentage())
+        BigDecimal DEPOSIT_RATE = Optional.ofNullable(businessSettingsService.getOrCreate().getDiscountPercentage())
                 .orElse(BigDecimal.ZERO)
                 .divide(DIVISOR, 6,RoundingMode.HALF_UP);
 

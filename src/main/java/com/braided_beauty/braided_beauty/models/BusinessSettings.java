@@ -36,5 +36,5 @@ public class BusinessSettings {
     private Integer appointmentBufferTime = 0;
 
     @Column(name = "discount_percentage", precision = 5, scale = 2)
-    private BigDecimal discountPercentage;
+    private BigDecimal discountPercentage = BigDecimal.ZERO;
 }

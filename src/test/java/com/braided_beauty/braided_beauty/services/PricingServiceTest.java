@@ -30,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -89,6 +90,24 @@ class PricingServiceTest {
         assertEquals(new BigDecimal("45.00"), breakdown.amountDueBeforeTip());
         assertEquals(new BigDecimal("10.00"), breakdown.tip());
         assertEquals(new BigDecimal("55.00"), breakdown.amountDuePlusTip());
+    }
+
+    @Test
+    void calculate_treatsNullDiscountPercentageAsZero() {
+        BusinessSettings settings = new BusinessSettings();
+        settings.setDiscountPercentage(null);
+        when(businessSettingsService.getOrCreate()).thenReturn(settings);
+
+        Appointment appointment = new Appointment();
+        ServiceModel service = new ServiceModel();
+        service.setPrice(new BigDecimal("100.00"));
+        appointment.setService(service);
+
+        PricingBreakdown breakdown = assertDoesNotThrow(() -> pricingService.calculate(appointment));
+
+        assertEquals(new BigDecimal("100.00"), breakdown.subtotal());
+        assertEquals(new BigDecimal("0.00"), breakdown.deposit());
+        assertEquals(new BigDecimal("100.00"), breakdown.postDepositBalance());
     }
 
     @Test
