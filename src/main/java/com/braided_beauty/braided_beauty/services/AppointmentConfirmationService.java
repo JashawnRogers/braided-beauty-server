@@ -111,7 +111,9 @@ public class AppointmentConfirmationService {
                 appointment.getDepositAmount(),
                 appointment.getRemainingBalance(),
                 appointment.getPaymentStatus(),
-                appointment.getRemainingBalance()
+                appointment.getRemainingBalance(),
+                appointment.getTotalAmount(),
+                appointment.getServicePriceAtBooking()
                 );
     }
 

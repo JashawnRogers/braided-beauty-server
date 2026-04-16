@@ -14,6 +14,8 @@ public record BookingConfirmationDTO(
         BigDecimal depositAmount,
         BigDecimal totalAmountRemaining,
         PaymentStatus paymentStatus,
-        BigDecimal remainingBalance
+        BigDecimal remainingBalance,
+        BigDecimal totalAmount,
+        BigDecimal servicePrice
 ) {
 }
