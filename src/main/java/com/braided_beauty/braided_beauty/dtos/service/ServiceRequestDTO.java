@@ -55,4 +55,6 @@ public class ServiceRequestDTO {
 
     @Nullable
     private UUID scheduleCalendarId;
+
+    private boolean privateService;
 }

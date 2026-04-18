@@ -69,6 +69,8 @@ public class ServiceDtoMapper {
         if (dto.getVideoKey() != null && !dto.getVideoKey().isBlank()) {
             service.setVideoKey(dto.getVideoKey().trim());
         }
+
+        service.setPrivateService(dto.isPrivateService());
         return service;
     }
 
@@ -89,6 +91,7 @@ public class ServiceDtoMapper {
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .addOns(addOns)
+                .privateService(service.isPrivateService())
                 .build();
     }
 
@@ -98,6 +101,7 @@ public class ServiceDtoMapper {
         if (dto.getDescription() != null) service.setDescription(normalizeDescription(dto.getDescription()));
         if (dto.getPrice() != null) service.setPrice(dto.getPrice().setScale(2, RoundingMode.UNNECESSARY));
         if (dto.getDurationMinutes() != null) service.setDurationMinutes(dto.getDurationMinutes());
+        if (dto.isPrivateService()!= service.isPrivateService()) service.setPrivateService(dto.isPrivateService());
 
         // Photos: incremental add/remove
         LinkedHashSet<String> keys = new LinkedHashSet<>(Optional.ofNullable(service.getPhotoKeys()).orElse(List.of()));

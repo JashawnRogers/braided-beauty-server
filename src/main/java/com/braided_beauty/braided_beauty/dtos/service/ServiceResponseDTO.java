@@ -31,5 +31,6 @@ public class ServiceResponseDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @Nullable private List<AddOnResponseDTO> addOns;
+    private boolean privateService;
 
 }

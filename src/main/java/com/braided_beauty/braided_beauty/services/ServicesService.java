@@ -105,6 +105,8 @@ public class ServicesService {
             existingService.setAddOns(addOnRepository.findAllById(dto.getAddOnIds()));
         }
 
+        existingService.setPrivateService(dto.isPrivateService());
+
         if (dto.getRemovePhotoKeys() != null && !dto.getRemovePhotoKeys().isEmpty()) {
             var beforeSet = new HashSet<>(beforeKeys);
             for (String key : dto.getRemovePhotoKeys()) {
@@ -138,9 +140,13 @@ public class ServicesService {
                 .map(dto -> {attachPhotoUrls(dto); return dto; });
     }
 
+    /**
+     * Only returns services that have isPrivate set to false.
+     * **/
     public List<ServiceResponseDTO> getAllServicesByList() {
         return serviceRepository.findAll()
                 .stream()
+                .filter(service -> !service.isPrivateService())
                 .map(serviceDtoMapper::toDto)
                 .peek(this::attachPhotoUrls)
                 .toList();

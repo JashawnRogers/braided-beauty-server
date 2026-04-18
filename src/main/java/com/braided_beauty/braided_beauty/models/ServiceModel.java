@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +53,9 @@ public class ServiceModel {
 
     @Column(name = "times_booked")
     private Integer timesBooked = 0;
+
+    @Column(name = "is_private")
+    private boolean privateService = false;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
