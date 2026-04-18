@@ -68,6 +68,10 @@ public class ServicesService {
             entity.setAddOns(addOnProxies);
         }
 
+        if (dto.getPhotoKeys() != null && !dto.getPhotoKeys().isEmpty()) {
+            entity.setPhotoKeys(dto.getPhotoKeys());
+        }
+
 
         ServiceModel saved = serviceRepository.save(entity);
         log.info("Created service with ID: {}", saved.getId());
