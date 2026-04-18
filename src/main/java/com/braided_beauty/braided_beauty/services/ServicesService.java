@@ -144,9 +144,8 @@ public class ServicesService {
      * Only returns services that have isPrivate set to false.
      * **/
     public List<ServiceResponseDTO> getAllServicesByList() {
-        return serviceRepository.findAll()
+        return serviceRepository.findByPrivateServiceFalse()
                 .stream()
-                .filter(service -> !service.isPrivateService())
                 .map(serviceDtoMapper::toDto)
                 .peek(this::attachPhotoUrls)
                 .toList();
@@ -164,7 +163,7 @@ public class ServicesService {
         return dto;
     }
     public List<ServiceResponseDTO> getAllServicesByCategory(UUID categoryId) {
-       return serviceRepository.findAllByCategoryId(categoryId)
+       return serviceRepository.findAllByCategoryIdAndPrivateServiceFalse(categoryId)
                 .orElseThrow(() -> new NotFoundException("No services found under this category"))
                 .stream()
                 .map(serviceDtoMapper::toDto)

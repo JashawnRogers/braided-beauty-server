@@ -22,6 +22,8 @@ import java.util.UUID;
 public interface ServiceRepository extends JpaRepository<ServiceModel, UUID>, JpaSpecificationExecutor<ServiceModel> {
     boolean existsByNameAndCategory_Id(String name, UUID categoryId);
 
+    List<ServiceModel> findByPrivateServiceFalse();
+
     Optional<ServiceModel> findTopByOrderByTimesBookedDesc();
 
     boolean existsByCategoryId(UUID id);
@@ -35,7 +37,7 @@ public interface ServiceRepository extends JpaRepository<ServiceModel, UUID>, Jp
     Optional<ServiceModel> findById(UUID uuid);
 
     @EntityGraph(attributePaths = {"category", "addOns", "scheduleCalendar"})
-    Optional<List<ServiceModel>> findAllByCategoryId(UUID categoryId);
+    Optional<List<ServiceModel>> findAllByCategoryIdAndPrivateServiceFalse(UUID categoryId);
 
     List<ServiceModel> findAllByScheduleCalendar_Id(UUID calendarId);
 
