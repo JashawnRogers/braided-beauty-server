@@ -48,8 +48,8 @@ public class ServicesService {
             throw new IllegalArgumentException("Price is required");
         }
 
-        if (serviceRepository.existsByName(dto.getName().trim())){
-            throw new DuplicateEntityException("A service with this name already exists.");
+        if (serviceRepository.existsByNameAndCategory_Id(dto.getName().trim(), dto.getCategoryId())){
+            throw new DuplicateEntityException("A service with this name already exists in this category.");
         }
 
         ServiceModel entity = serviceDtoMapper.create(dto);

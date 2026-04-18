@@ -1,6 +1,5 @@
 package com.braided_beauty.braided_beauty.repositories;
 
-import com.braided_beauty.braided_beauty.dtos.service.ServiceResponseDTO;
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.records.ServicePopularityRow;
@@ -21,7 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ServiceRepository extends JpaRepository<ServiceModel, UUID>, JpaSpecificationExecutor<ServiceModel> {
-    boolean existsByName(String name);
+    boolean existsByNameAndCategory_Id(String name, UUID categoryId);
 
     Optional<ServiceModel> findTopByOrderByTimesBookedDesc();
 
