@@ -23,10 +23,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
@@ -161,6 +159,7 @@ public class ServicesService {
                 .stream()
                 .map(serviceDtoMapper::toDto)
                 .peek(this::attachPhotoUrls)
+                .sorted(Comparator.comparing(ServiceResponseDTO::getName).reversed())
                 .toList();
     }
 
