@@ -17,7 +17,7 @@ public class EmailService {
 
         try {
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage,true, "UTF-8");
-            helper.setFrom("braidedbeautybrand@gmail.com");
+            helper.setFrom("braidedbeautybrand@braidedbeautyco.com");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(html, true);
