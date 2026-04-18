@@ -163,7 +163,10 @@ public class ServicesService {
                 .stream()
                 .map(serviceDtoMapper::toDto)
                 .peek(this::attachPhotoUrls)
-                .sorted(Comparator.comparing(ServiceResponseDTO::getName).reversed())
+                .sorted(
+                        Comparator.comparing((ServiceResponseDTO service) -> getPrioritySize(service.getName()))
+                                .thenComparing(ServiceResponseDTO::getName)
+                )
                 .toList();
     }
 
@@ -187,5 +190,26 @@ public class ServicesService {
             dto.setPhotoUrls(null);
         }
 
+    }
+
+    private static final Map<String, Integer> SIZE_PRIORITY = Map.of(
+            "small", 0,
+            "medium", 1,
+            "large", 2,
+            "Jumbo", 3
+    );
+
+    /**
+     Services need to be in order from small, medium, large, Jumbo.
+     Any other service is sorted alphabetically
+     * */
+    private int getPrioritySize(String name) {
+        String lower = name.toLowerCase();
+
+        return SIZE_PRIORITY.entrySet().stream()
+                .filter(entry -> lower.startsWith(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(3);
     }
 }
