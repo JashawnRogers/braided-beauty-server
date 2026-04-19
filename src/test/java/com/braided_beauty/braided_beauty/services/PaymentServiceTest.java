@@ -3,8 +3,10 @@ package com.braided_beauty.braided_beauty.services;
 import com.braided_beauty.braided_beauty.enums.PaymentMethod;
 import com.braided_beauty.braided_beauty.enums.PaymentStatus;
 import com.braided_beauty.braided_beauty.enums.PaymentType;
+import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
 import com.braided_beauty.braided_beauty.exceptions.ConflictException;
 import com.braided_beauty.braided_beauty.models.Appointment;
+import com.braided_beauty.braided_beauty.models.BusinessSettings;
 import com.braided_beauty.braided_beauty.models.Payment;
 import com.braided_beauty.braided_beauty.models.ServiceModel;
 import com.braided_beauty.braided_beauty.models.User;
@@ -22,7 +24,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -226,6 +231,116 @@ class PaymentServiceTest {
         assertEquals(PaymentType.FINAL, savedPayment.getPaymentType());
     }
 
+    @Test
+    void handleCheckoutSessionCompleted_confirmsPendingDepositAppointment() {
+        Appointment appointment = appointmentWithUser();
+        appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+        appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
+        appointment.setHoldExpiresAt(LocalDateTime.now().plusMinutes(15));
+        appointment.setDepositAmount(new BigDecimal("25.00"));
+        appointment.setPostDepositBalanceAtBooking(new BigDecimal("75.00"));
+        appointment.setDiscountAmount(BigDecimal.ZERO);
+        appointment.setSubtotalAtBooking(new BigDecimal("100.00"));
+
+        Payment payment = Payment.builder()
+                .appointment(appointment)
+                .paymentType(PaymentType.DEPOSIT)
+                .paymentStatus(PaymentStatus.PENDING_PAYMENT)
+                .stripeSessionId("cs_paid")
+                .build();
+
+        BusinessSettings businessSettings = new BusinessSettings();
+        businessSettings.setCompanyPhoneNumber("6025551212");
+        businessSettings.setCompanyAddress("123 Main St");
+        businessSettings.setCompanyEmail("owner@example.com");
+
+        Session session = new Session();
+        session.setId("cs_paid");
+        session.setPaymentIntent("pi_paid");
+        session.setMetadata(Map.of(
+                "appointmentId", appointment.getId().toString(),
+                "paymentType", "deposit"
+        ));
+
+        when(paymentRepository.findByStripeSessionId("cs_paid")).thenReturn(Optional.of(payment));
+        when(appointmentRepository.findByIdForUpdate(appointment.getId())).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(serviceRepository.save(any(ServiceModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(businessSettingsService.getOrCreate()).thenReturn(businessSettings);
+        when(emailTemplateService.render(any(), any())).thenReturn("<html/>");
+
+        paymentService.handleCheckoutSessionCompleted(session);
+
+        assertEquals(AppointmentStatus.CONFIRMED, appointment.getAppointmentStatus());
+        assertEquals(PaymentStatus.PAID_DEPOSIT, appointment.getPaymentStatus());
+        assertEquals(new BigDecimal("75.00"), appointment.getRemainingBalance());
+        assertEquals(null, appointment.getHoldExpiresAt());
+        verify(paymentRepository).save(payment);
+        verify(appointmentRepository).save(appointment);
+        verify(serviceRepository).save(appointment.getService());
+    }
+
+    @Test
+    void handleCheckoutSessionFailed_deletesPendingDepositHold() {
+        Appointment appointment = appointmentWithUser();
+        appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+        appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
+
+        Payment payment = Payment.builder()
+                .appointment(appointment)
+                .paymentType(PaymentType.DEPOSIT)
+                .paymentStatus(PaymentStatus.PENDING_PAYMENT)
+                .stripeSessionId("cs_failed")
+                .build();
+
+        Session session = new Session();
+        session.setId("cs_failed");
+        session.setMetadata(Map.of(
+                "appointmentId", appointment.getId().toString(),
+                "paymentType", "deposit"
+        ));
+
+        when(appointmentRepository.findByIdForUpdate(appointment.getId())).thenReturn(Optional.of(appointment));
+        when(paymentRepository.findByStripeSessionId("cs_failed")).thenReturn(Optional.of(payment));
+
+        paymentService.handleCheckoutSessionFailed(session);
+
+        verify(paymentRepository).deleteByAppointment_Id(appointment.getId());
+        verify(appointmentRepository).delete(appointment);
+    }
+
+    @Test
+    void releasePendingAppointmentHold_expiresOpenSessionAndDeletesAppointment() throws Exception {
+        Appointment appointment = appointmentWithUser();
+        appointment.setAppointmentStatus(AppointmentStatus.PENDING_CONFIRMATION);
+        appointment.setPaymentStatus(PaymentStatus.PENDING_PAYMENT);
+        appointment.setStripeSessionId("cs_open");
+
+        Payment payment = Payment.builder()
+                .appointment(appointment)
+                .paymentType(PaymentType.DEPOSIT)
+                .paymentStatus(PaymentStatus.PENDING_PAYMENT)
+                .stripeSessionId("cs_open")
+                .build();
+
+        Session session = new Session();
+        session.setId("cs_open");
+        session.setStatus("open");
+        session.setPaymentStatus("unpaid");
+
+        when(appointmentRepository.findByIdForUpdate(appointment.getId())).thenReturn(Optional.of(appointment));
+        when(paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), PaymentType.DEPOSIT))
+                .thenReturn(Optional.of(payment));
+        when(stripeGateway.retrieveCheckoutSession("cs_open")).thenReturn(session);
+
+        paymentService.releasePendingAppointmentHold(appointment.getId());
+
+        verify(stripeGateway).expireCheckoutSession("cs_open");
+        verify(paymentRepository).deleteByAppointment_Id(appointment.getId());
+        verify(appointmentRepository).delete(appointment);
+    }
+
     private static Appointment appointmentWithUser() {
         User user = new User();
         user.setId(UUID.randomUUID());
@@ -240,8 +355,9 @@ class PaymentServiceTest {
         appointment.setId(UUID.randomUUID());
         appointment.setUser(user);
         appointment.setService(service);
-        appointment.setAddOns(List.of());
+        appointment.setAddOns(new ArrayList<>());
         appointment.setFeeTotal(BigDecimal.ZERO.setScale(2));
+        appointment.setAppointmentTime(LocalDateTime.of(2026, 5, 10, 9, 0));
         return appointment;
     }
 }

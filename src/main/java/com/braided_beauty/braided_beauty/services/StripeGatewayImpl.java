@@ -36,4 +36,12 @@ public class StripeGatewayImpl implements StripeGateway {
     public Session retrieveCheckoutSession(String sessionId) throws StripeException {
         return Session.retrieve(sessionId);
     }
+
+    /**
+     * Expires an open Stripe Checkout session.
+     */
+    @Override
+    public Session expireCheckoutSession(String sessionId) throws StripeException {
+        return Session.retrieve(sessionId).expire();
+    }
 }

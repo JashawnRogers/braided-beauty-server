@@ -100,6 +100,7 @@ public class SecurityConfig {
                                 "/api/v1/pricing/**",
                                 "/error"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/appointments/holds/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/webhook/stripe").permitAll()
                         // Everything else secured
                         .anyRequest().authenticated()

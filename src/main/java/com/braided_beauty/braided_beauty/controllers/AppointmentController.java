@@ -48,6 +48,13 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.cancelGuestAppointment(token, reason));
     }
 
+    @DeleteMapping("/holds/{id}")
+    @Operation(summary = "Release a pending checkout hold before the deposit is paid")
+    public ResponseEntity<Void> releaseCheckoutHold(@PathVariable UUID id) throws StripeException {
+        appointmentService.releaseCheckoutHold(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/guest/{token}")
     public ResponseEntity<AppointmentResponseDTO> getGuestAppointment(@PathVariable String token) {
         return ResponseEntity.ok(appointmentService.getGuestAppointmentByToken(token));

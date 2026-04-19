@@ -1,47 +1,37 @@
 package com.braided_beauty.braided_beauty.services;
 
 import com.braided_beauty.braided_beauty.enums.AppointmentStatus;
-import com.braided_beauty.braided_beauty.enums.PaymentStatus;
-import com.braided_beauty.braided_beauty.enums.PaymentType;
 import com.braided_beauty.braided_beauty.models.Appointment;
 import com.braided_beauty.braided_beauty.repositories.AppointmentRepository;
-import com.braided_beauty.braided_beauty.repositories.PaymentRepository;
+import com.stripe.exception.StripeException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AppointmentExpiredHoldCleanupJob {
     private final AppointmentRepository appointmentRepository;
-    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
 
-    @Scheduled(cron = "0 0 * * * *") // top of every hour
-    @Transactional
+    @Scheduled(cron = "0 * * * * *")
     public void deleteExpiredHolds() {
-        List<Appointment> expiredAppointments = appointmentRepository.findExpiredPendingHolds();
+        List<UUID> expiredAppointmentIds = appointmentRepository.findExpiredPendingHolds().stream()
+                .filter(appointment -> appointment.getAppointmentStatus() == AppointmentStatus.PENDING_CONFIRMATION)
+                .map(Appointment::getId)
+                .toList();
 
-        for (Appointment appointment : expiredAppointments) {
-            boolean depositPaid = paymentRepository.existsByAppointment_IdAndPaymentTypeAndPaymentStatus(
-                    appointment.getId(),
-                    PaymentType.DEPOSIT,
-                    PaymentStatus.PAID_DEPOSIT
-            );
-
-            if (depositPaid) {
-                appointment.setHoldExpiresAt(null);
-                appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
-                appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
-                appointmentRepository.save(appointment);
-                continue;
+        for (UUID appointmentId : expiredAppointmentIds) {
+            try {
+                paymentService.reconcileExpiredPendingAppointmentHold(appointmentId);
+            } catch (StripeException ex) {
+                log.error("Failed to reconcile expired hold for appointment {}: {}", appointmentId, ex.getMessage(), ex);
             }
-
-            paymentRepository.deleteByAppointment_Id(appointment.getId());
-            appointment.getAddOns().clear();
-            appointmentRepository.delete(appointment);
         }
     }
 }

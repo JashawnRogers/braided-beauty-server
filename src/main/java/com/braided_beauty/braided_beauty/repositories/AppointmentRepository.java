@@ -49,8 +49,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
             value = """
         SELECT a.*
         FROM appointments a
-        WHERE a.appointment_time >= :start
-          AND a.appointment_time < :end
+        WHERE a.appointment_time < :end
+          AND (a.appointment_time + ((a.duration_minutes + :bufferMinutes) * interval '1 minute')) > :start
           AND a.schedule_calendar_id = :calendarId
           AND (
                 a.appointment_status IN ('CONFIRMED', 'COMPLETED', 'NO_SHOW')
@@ -67,6 +67,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     List<Appointment> findBlockingAppointmentsForWindow(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end,
+            @Param("bufferMinutes") int bufferMinutes,
             @Param("calendarId") UUID calendarId
     );
 

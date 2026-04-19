@@ -387,16 +387,33 @@ public class PaymentService {
      */
     @Transactional
     public void handleCheckoutSessionCompleted(Session session) {
-        String paymentType = session.getMetadata().get("paymentType");
-        String appointmentId = session.getMetadata().get("appointmentId");
+        Map<String, String> metadata = sessionMetadata(session);
+        String paymentType = metadata.get("paymentType");
+        String appointmentId = metadata.get("appointmentId");
+
+        Payment payment = paymentRepository.findByStripeSessionId(session.getId()).orElse(null);
+
+        if (payment != null) {
+            appointmentId = payment.getAppointment().getId().toString();
+            paymentType = payment.getPaymentType().name().toLowerCase(Locale.ROOT);
+        }
 
         if (paymentType == null || appointmentId == null) {
             log.warn("Missing metadata on Checkout Session {}: appointmentId/paymentType", session.getId());
             throw new IllegalStateException("payment type cannot be null: " + paymentType + ". appointmentId: " + appointmentId);
         }
 
-        Appointment appointment = appointmentRepository.findById(UUID.fromString(appointmentId))
-                .orElseThrow(() -> new NotFoundException("Appointment not found: " + appointmentId));
+        final String resolvedAppointmentId = appointmentId;
+        final String resolvedPaymentType = paymentType;
+
+        Appointment appointment = appointmentRepository.findByIdForUpdate(UUID.fromString(resolvedAppointmentId))
+                .orElseThrow(() -> new NotFoundException("Appointment not found: " + resolvedAppointmentId));
+
+        if (payment == null) {
+            PaymentType resolvedType = PaymentType.valueOf(resolvedPaymentType.toUpperCase(Locale.ROOT));
+            payment = paymentRepository.findByAppointment_IdAndPaymentType(appointment.getId(), resolvedType)
+                    .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
+        }
 
         ServiceModel service = Objects.requireNonNull(appointment.getService(), "Appointment service is required");
 
@@ -405,22 +422,19 @@ public class PaymentService {
         BusinessSettings settings = businessSettingsService.getOrCreate();
         String companyPhoneNumber  = PhoneNormalizer.formatForEmail(settings.getCompanyPhoneNumber());
 
-        log.info("Payment Type: {}", paymentType);
+        log.info("Payment Type: {}", resolvedPaymentType);
 
         // Idempotency: if the appointment is already in the terminal state for the given payment type, exit.
-        if ("deposit".equals(paymentType) && appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
-            log.info("Deposit already processed for appointment {}", appointmentId);
+        if ("deposit".equals(resolvedPaymentType) && appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
+            log.info("Deposit already processed for appointment {}", resolvedAppointmentId);
             return;
         }
-        if ("final".equals(paymentType)
+        if ("final".equals(resolvedPaymentType)
                 && (appointment.getAppointmentStatus() == AppointmentStatus.COMPLETED
                 || appointment.getPaymentStatus() == PaymentStatus.PAID_IN_FULL)) {
-            log.info("Final payment already processed for appointment {}", appointmentId);
+            log.info("Final payment already processed for appointment {}", resolvedAppointmentId);
             return;
         }
-
-        Payment payment = paymentRepository.findByStripeSessionId(session.getId())
-                .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
 
         // Idempotency: if this payment row already reflects a successful processing, do nothing.
         if (payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT
@@ -555,11 +569,11 @@ public class PaymentService {
                         appointmentConfirmationService.ensureConfirmationTokenForAppointment(saved.getId());
                     } catch (Exception ex) {
                         log.error("Post-commit deposit email/token work failed. sessionId={} apptId={} msg={}",
-                                session.getId(), appointmentId, ex.getMessage(), ex);
+                                session.getId(), resolvedAppointmentId, ex.getMessage(), ex);
                     }
                 };
 
-                log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), appointmentId);
+                log.info("Deposit completed via checkout session {} for appointment {}", session.getId(), resolvedAppointmentId);
             }
             case FINAL -> {
                 BigDecimal serviceAmount = Objects.requireNonNullElse(appointment.getServicePriceAtBooking(), BigDecimal.ZERO);
@@ -613,11 +627,11 @@ public class PaymentService {
                         emailService.sendHtmlEmail(email, "Final Payment Received", html);
                     } catch (Exception ex) {
                         log.error("Post-commit final email work failed. sessionId={} apptId={} msg={}",
-                                session.getId(), appointmentId, ex.getMessage(), ex);
+                                session.getId(), resolvedAppointmentId, ex.getMessage(), ex);
                     }
                 };
 
-                log.info("Final payment completed via session: {} for appointment: {}", session.getId(), appointmentId);
+                log.info("Final payment completed via session: {} for appointment: {}", session.getId(), resolvedAppointmentId);
             }
         }
 
@@ -641,31 +655,204 @@ public class PaymentService {
      */
     @Transactional
     public void handleCheckoutSessionFailed(Session session) {
-        String appointmentId = session.getMetadata().get("appointmentId");
-        String paymentType = session.getMetadata().get("paymentType");
+        Map<String, String> metadata = sessionMetadata(session);
+        String appointmentId = metadata.get("appointmentId");
+        String paymentType = metadata.get("paymentType");
 
         if (appointmentId == null || paymentType == null) {
             log.warn("Missing metadata on failed session session: {}", session.getId());
             return;
         }
 
-        Appointment appointment = appointmentRepository.findById(UUID.fromString(appointmentId))
-                        .orElseThrow(() -> new NotFoundException("Appointment not found."));
+        Appointment appointment = appointmentRepository.findByIdForUpdate(UUID.fromString(appointmentId))
+                .orElseThrow(() -> new NotFoundException("Appointment not found."));
 
         Payment payment = paymentRepository.findByStripeSessionId(session.getId())
-                        .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
+                .orElseThrow(() -> new NotFoundException("Payment not found for session: " + session.getId()));
 
         if (payment.getPaymentStatus() == PaymentStatus.PAYMENT_FAILED) return;
+
+        if (payment.getPaymentType() == PaymentType.DEPOSIT
+                && appointment.getAppointmentStatus() == AppointmentStatus.PENDING_CONFIRMATION) {
+            payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
+            paymentRepository.save(payment);
+            deletePendingAppointmentHold(appointment);
+            log.info("Released pending appointment hold after failed deposit checkout. appointmentId={} sessionId={}",
+                    appointmentId, session.getId());
+            return;
+        }
 
         payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
         paymentRepository.save(payment);
 
         appointment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
-        appointment.setAppointmentStatus(AppointmentStatus.CANCELED);
-        appointment.setCancelReason("Payment failed / abandoned checkout");
-        appointment.setHoldExpiresAt(null);
+        appointment.setCancelReason("Payment failed");
         appointmentRepository.save(appointment);
         log.info("Appointment {} marked as PAYMENT_FAILED. / paymentIntent {}", appointmentId, session.getPaymentIntent());
+    }
+
+    /**
+     * Removes a pending deposit hold when Stripe expires the checkout session.
+     */
+    @Transactional
+    public void handleCheckoutSessionExpired(Session session) {
+        Map<String, String> metadata = sessionMetadata(session);
+        String appointmentId = metadata.get("appointmentId");
+        String paymentType = metadata.get("paymentType");
+
+        if (appointmentId == null || paymentType == null) {
+            log.warn("Missing metadata on expired session {}", session.getId());
+            return;
+        }
+
+        if (!"deposit".equalsIgnoreCase(paymentType)) {
+            log.info("Ignoring expired non-deposit checkout session {}", session.getId());
+            return;
+        }
+
+        Appointment appointment = appointmentRepository.findByIdForUpdate(UUID.fromString(appointmentId))
+                .orElse(null);
+
+        if (appointment == null) {
+            log.info("Pending hold already cleared for expired session {}", session.getId());
+            return;
+        }
+
+        if (appointment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
+            log.info("Ignoring expired event for already-paid deposit session {}", session.getId());
+            return;
+        }
+
+        Payment payment = paymentRepository.findByStripeSessionId(session.getId()).orElse(null);
+        if (payment != null && payment.getPaymentStatus() != PaymentStatus.PAYMENT_FAILED) {
+            payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
+            paymentRepository.save(payment);
+        }
+
+        if (appointment.getAppointmentStatus() == AppointmentStatus.PENDING_CONFIRMATION) {
+            deletePendingAppointmentHold(appointment);
+            log.info("Released pending appointment hold after checkout expiration. appointmentId={} sessionId={}",
+                    appointmentId, session.getId());
+        }
+    }
+
+    /**
+     * Reconciles an expired pending hold against Stripe before deleting it locally.
+     */
+    @Transactional
+    public void reconcileExpiredPendingAppointmentHold(UUID appointmentId) throws StripeException {
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId).orElse(null);
+        if (appointment == null) {
+            return;
+        }
+
+        if (appointment.getAppointmentStatus() != AppointmentStatus.PENDING_CONFIRMATION) {
+            return;
+        }
+
+        if (appointment.getHoldExpiresAt() == null || appointment.getHoldExpiresAt().isAfter(LocalDateTime.now())) {
+            return;
+        }
+
+        Payment payment = paymentRepository.findByAppointment_IdAndPaymentType(appointmentId, PaymentType.DEPOSIT)
+                .orElse(null);
+
+        if (payment != null && payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
+            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+            appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+            appointment.setHoldExpiresAt(null);
+            appointmentRepository.save(appointment);
+            return;
+        }
+
+        String sessionId = payment != null ? payment.getStripeSessionId() : appointment.getStripeSessionId();
+        if (sessionId == null || sessionId.isBlank()) {
+            deletePendingAppointmentHold(appointment);
+            return;
+        }
+
+        Session session = stripeGateway.retrieveCheckoutSession(sessionId);
+        if (isPaidCheckoutSession(session)) {
+            handleCheckoutSessionCompleted(session);
+            return;
+        }
+
+        if (isOpenCheckoutSession(session)) {
+            stripeGateway.expireCheckoutSession(sessionId);
+        }
+
+        if (payment != null && payment.getPaymentStatus() != PaymentStatus.PAYMENT_FAILED) {
+            payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
+            paymentRepository.save(payment);
+        }
+
+        deletePendingAppointmentHold(appointment);
+        log.info("Expired pending hold released. appointmentId={} sessionId={}", appointmentId, sessionId);
+    }
+
+    /**
+     * Releases a pending appointment hold before payment succeeds.
+     */
+    @Transactional
+    public void releasePendingAppointmentHold(UUID appointmentId) throws StripeException {
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new NotFoundException("Appointment not found."));
+
+        if (appointment.getAppointmentStatus() != AppointmentStatus.PENDING_CONFIRMATION) {
+            log.info("Skipping hold release for non-pending appointment {}", appointmentId);
+            return;
+        }
+
+        Payment payment = paymentRepository.findByAppointment_IdAndPaymentType(appointmentId, PaymentType.DEPOSIT)
+                .orElse(null);
+
+        if (payment != null && payment.getPaymentStatus() == PaymentStatus.PAID_DEPOSIT) {
+            appointment.setAppointmentStatus(AppointmentStatus.CONFIRMED);
+            appointment.setPaymentStatus(PaymentStatus.PAID_DEPOSIT);
+            appointment.setHoldExpiresAt(null);
+            appointmentRepository.save(appointment);
+            return;
+        }
+
+        String sessionId = payment != null ? payment.getStripeSessionId() : appointment.getStripeSessionId();
+        if (sessionId != null && !sessionId.isBlank()) {
+            Session stripeSession = stripeGateway.retrieveCheckoutSession(sessionId);
+            if (isPaidCheckoutSession(stripeSession)) {
+                handleCheckoutSessionCompleted(stripeSession);
+                return;
+            }
+            if (isOpenCheckoutSession(stripeSession)) {
+                stripeGateway.expireCheckoutSession(sessionId);
+            }
+        }
+
+        if (payment != null && payment.getPaymentStatus() != PaymentStatus.PAYMENT_FAILED) {
+            payment.setPaymentStatus(PaymentStatus.PAYMENT_FAILED);
+            paymentRepository.save(payment);
+        }
+
+        deletePendingAppointmentHold(appointment);
+        log.info("Pending appointment hold released manually. appointmentId={}", appointmentId);
+    }
+
+    private void deletePendingAppointmentHold(Appointment appointment) {
+        appointment.setHoldExpiresAt(null);
+        appointment.getAddOns().clear();
+        paymentRepository.deleteByAppointment_Id(appointment.getId());
+        appointmentRepository.delete(appointment);
+    }
+
+    private Map<String, String> sessionMetadata(Session session) {
+        return Optional.ofNullable(session.getMetadata()).orElse(Collections.emptyMap());
+    }
+
+    private boolean isPaidCheckoutSession(Session session) {
+        return "paid".equalsIgnoreCase(session.getPaymentStatus())
+                || "complete".equalsIgnoreCase(session.getStatus());
+    }
+
+    private boolean isOpenCheckoutSession(Session session) {
+        return "open".equalsIgnoreCase(session.getStatus());
     }
 
 }

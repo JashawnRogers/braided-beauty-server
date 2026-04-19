@@ -25,4 +25,9 @@ public interface StripeGateway {
      * Retrieves an existing Stripe Checkout session by ID.
      */
     Session retrieveCheckoutSession(String sessionId) throws StripeException;
+
+    /**
+     * Expires an open Stripe Checkout session by ID.
+     */
+    Session expireCheckoutSession(String sessionId) throws StripeException;
 }

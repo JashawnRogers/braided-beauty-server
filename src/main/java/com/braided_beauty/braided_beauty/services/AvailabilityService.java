@@ -89,7 +89,7 @@ public class AvailabilityService {
 
         // If single stylist: block against ALL appointments, not by serviceId.
         List<Appointment> appointments =
-                appointmentRepository.findBlockingAppointmentsForWindow(open, close, calendar.getId());
+                appointmentRepository.findBlockingAppointmentsForWindow(open, close, bufferMinutes, calendar.getId());
 
         List<TimeRange> blocked = appointments.stream()
                 .map(a -> {

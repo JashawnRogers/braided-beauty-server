@@ -38,7 +38,8 @@ public class StripeWebhookController {
     private static final Set<String> ALLOWED_EVENTS = Set.of(
             "checkout.session.completed",
             "checkout.session.async_payment_succeeded",
-            "checkout.session.async_payment_failed"
+            "checkout.session.async_payment_failed",
+            "checkout.session.expired"
     );
 
     @PostMapping
@@ -74,6 +75,14 @@ public class StripeWebhookController {
 
               paymentService.handleCheckoutSessionFailed(session);
               log.warn("Async payment failed. Session={}", session.getId());
+          }
+          case "checkout.session.expired" -> {
+              Session session = (Session) event.getDataObjectDeserializer()
+                      .getObject()
+                      .orElseThrow(() -> new IllegalArgumentException("Failed to deserialize Session"));
+
+              paymentService.handleCheckoutSessionExpired(session);
+              log.info("Checkout session expired: {}", session.getId());
           }
           default -> log.info("Unhandled event type: {}", event.getType());
 

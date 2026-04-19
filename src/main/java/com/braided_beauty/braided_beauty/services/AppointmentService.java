@@ -213,7 +213,7 @@ public class AppointmentService {
             if (isUniqueViolation(ex)) {
                 log.warn("Appointment creation rejected by unique booking constraint. serviceId={} calendarId={} appointmentTime={}",
                         dto.getServiceId(), calendarId, appointment.getAppointmentTime());
-                throw new ConflictException("That time was just booked. Please pick another time.");
+                throw new ConflictException("Unfortunately that time was just booked. Please pick another time.");
             }
             throw ex;
         }
@@ -274,6 +274,10 @@ public class AppointmentService {
         Appointment appointment = appointmentRepository.findByGuestCancelToken(token)
                 .orElseThrow(() -> new NotFoundException("Appointment not found"));
         return appointmentDtoMapper.toDTO(appointment);
+    }
+
+    public void releaseCheckoutHold(UUID appointmentId) throws StripeException {
+        paymentService.releasePendingAppointmentHold(appointmentId);
     }
 
     public List<AppointmentResponseDTO> getAllAppointmentsByDate(LocalDate date){
